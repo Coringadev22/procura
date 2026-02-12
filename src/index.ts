@@ -16,6 +16,7 @@ import { startAutomationScheduler, cancelAllJobs } from "./services/automation.s
 
 const app = Fastify({
   logger: false,
+  requestTimeout: 600_000,
 });
 
 // Plugins
