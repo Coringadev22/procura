@@ -119,6 +119,7 @@ export async function enrichLicitacao(
       nomeFantasia: data.nomeFantasia,
       email: data.email,
       emailSource: data.emailSource,
+      emailCategory: data.emailCategory,
       telefones: data.telefones,
       municipio: data.municipio,
       uf: data.uf,

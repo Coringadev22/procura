@@ -29,6 +29,7 @@ export interface FornecedorComEmail {
   nomeFantasia: string | null;
   email: string | null;
   emailSource: string;
+  emailCategory: string;
   telefones: string | null;
   municipio: string | null;
   uf: string | null;

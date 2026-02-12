@@ -85,6 +85,16 @@ const HTML = `<!DOCTYPE html>
     .badge-blue { background: #0c1e3a; color: #3b82f6; }
     .badge-yellow { background: #2a2100; color: #eab308; }
     .badge-gray { background: #1e293b; color: #64748b; }
+    .badge-orange { background: #2a1600; color: #f97316; }
+    .badge-cat { cursor: pointer; border: none; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px; display: inline-block; }
+    .badge-cat:hover { opacity: 0.8; }
+    .filter-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; font-size: 12px; cursor: pointer; font-weight: 500; }
+    .filter-btn:hover { background: #334155; color: #e2e8f0; }
+    .filter-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+    .filter-btn.active-green { background: #22c55e; color: #fff; border-color: #22c55e; }
+    .filter-btn.active-yellow { background: #eab308; color: #000; border-color: #eab308; }
+    .filter-btn.active-orange { background: #f97316; color: #fff; border-color: #f97316; }
+    .tab.tab-purple.active { background: #8b5cf6; }
 
     .email-link { color: #3b82f6; text-decoration: none; }
     .email-link:hover { text-decoration: underline; }
@@ -148,6 +158,7 @@ const HTML = `<!DOCTYPE html>
       <div class="tab" data-tab="fornecedores">Fornecedores</div>
       <div class="tab" data-tab="contratos">Contratos</div>
       <div class="tab" data-tab="cnpj">Consulta CNPJ</div>
+      <div class="tab tab-purple" data-tab="gmail">Gmail / Email</div>
     </div>
 
     <!-- ============ BUSCA DE EMAILS ============ -->
@@ -213,6 +224,11 @@ const HTML = `<!DOCTYPE html>
 
       <div id="leads-stats" class="stats"></div>
       <div class="actions-bar" id="leads-actions">
+        <button class="filter-btn active" id="filter-todos" onclick="filterLeads('todos')">Todos</button>
+        <button class="filter-btn" id="filter-empresa" onclick="filterLeads('empresa')">Empresas</button>
+        <button class="filter-btn" id="filter-provavel_contabilidade" onclick="filterLeads('provavel_contabilidade')">Prov. Contab.</button>
+        <button class="filter-btn" id="filter-contabilidade" onclick="filterLeads('contabilidade')">Contabilidades</button>
+        <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <button class="btn btn-green btn-sm" onclick="copyLeadEmails()">Copiar Emails</button>
         <button class="btn btn-primary btn-sm" onclick="exportLeadsCSV()">Exportar CSV</button>
         <button class="btn btn-red btn-sm" onclick="clearLeads()">Limpar Tudo</button>
@@ -348,6 +364,84 @@ const HTML = `<!DOCTYPE html>
       <div id="cnpj-loading" class="loading"><div class="spinner"></div><div class="loading-text">Consultando CNPJ na Receita Federal...</div></div>
       <div id="cnpj-results"></div>
     </div>
+    <!-- ============ GMAIL / EMAIL ============ -->
+    <div class="panel" id="panel-gmail">
+      <div class="info-box" id="gmail-status-box">
+        <strong>Gmail:</strong> Conecte sua conta Google para enviar emails diretamente da plataforma. Crie templates com variaveis como {empresa}, {cnpj}, {valor} e envie em lote para seus leads filtrados por categoria.
+      </div>
+
+      <div id="gmail-connect-section" class="search-box" style="display:none">
+        <h2>Conectar Gmail</h2>
+        <div class="desc">Clique no botao abaixo para autorizar o acesso ao Gmail via Google OAuth. Voce precisara configurar GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env antes.</div>
+        <a href="/api/gmail/auth" class="btn btn-primary">Conectar Conta Gmail</a>
+      </div>
+
+      <div id="gmail-not-configured" class="info-box warn" style="display:none">
+        <strong>Gmail nao configurado.</strong> Adicione GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET ao arquivo .env para habilitar o envio de emails. Veja as instrucoes no README.
+      </div>
+
+      <div id="gmail-account-section" class="card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <h4 id="gmail-account-name" style="color:#22c55e"></h4>
+            <div id="gmail-account-email" style="color:#64748b;font-size:13px"></div>
+            <div id="gmail-account-quota" style="color:#94a3b8;font-size:12px;margin-top:4px"></div>
+          </div>
+          <button class="btn btn-red btn-sm" id="gmail-disconnect-btn">Desconectar</button>
+        </div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Templates de Email</h2>
+          <button class="btn btn-green btn-sm" onclick="showTemplateForm()">Novo Template</button>
+        </div>
+
+        <div id="gmail-template-form" style="display:none;margin-bottom:16px;padding:16px;background:#0f172a;border-radius:10px;border:1px solid #334155">
+          <input type="hidden" id="tpl-edit-id" value="">
+          <div class="form-row">
+            <div class="form-group" style="flex:2"><label>Nome do Template</label><input type="text" id="tpl-name" placeholder="Ex: Proposta para empresas"></div>
+            <div class="form-group" style="flex:1"><label>Categoria Alvo</label><select id="tpl-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Todos</option><option value="empresa">Empresa</option><option value="contabilidade">Contabilidade</option><option value="provavel_contabilidade">Prov. Contabilidade</option></select></div>
+          </div>
+          <div class="form-group" style="margin-top:12px"><label>Assunto</label><input type="text" id="tpl-subject" placeholder="Ex: Proposta de parceria - {empresa}"></div>
+          <div class="form-group" style="margin-top:12px"><label>Corpo do Email (HTML, use {empresa}, {cnpj}, {valor}, {cidade}, {uf}, {contato})</label><textarea id="tpl-body" rows="8" style="width:100%;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:12px;font-size:13px;font-family:monospace;resize:vertical" placeholder="Prezado(a) {contato},&#10;&#10;Gostaríamos de apresentar nossos serviços..."></textarea></div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-green btn-sm" onclick="saveTemplate()">Salvar Template</button>
+            <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="hideTemplateForm()">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="gmail-templates-list"></div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px" id="gmail-send-section">
+        <h2>Enviar Emails</h2>
+        <div class="desc">Selecione um template e filtre os leads por categoria. O sistema envia 1 email por segundo (limite Gmail: 450/dia).</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Template</label>
+            <select id="gmail-send-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"></select>
+          </div>
+          <div class="form-group">
+            <label>Filtro de Leads</label>
+            <select id="gmail-send-filter" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px">
+              <option value="todos">Todos com email</option>
+              <option value="empresa">Apenas Empresas</option>
+              <option value="provavel_contabilidade">Prov. Contabilidade</option>
+              <option value="contabilidade">Apenas Contabilidades</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:0">
+            <label>&nbsp;</label>
+            <button class="btn btn-green" id="gmail-send-btn" onclick="sendGmailEmails()">Enviar</button>
+          </div>
+        </div>
+        <div id="gmail-send-preview" style="margin-top:12px;font-size:12px;color:#94a3b8"></div>
+        <div id="gmail-send-results" style="margin-top:12px"></div>
+      </div>
+
+      <div style="margin-top:20px" id="gmail-history"></div>
+    </div>
   </div>
 
   <!-- Modal de Detalhes da Licitacao -->
@@ -369,9 +463,29 @@ let contPage = 1;
 
 // ============ LEADS (localStorage) ============
 let leads = [];
+let leadFilter = 'todos';
+
+function autoCategoria(emailCategory, email) {
+  if (emailCategory === 'contabilidade') return 'contabilidade';
+  if (emailCategory === 'provavel_contabilidade') return 'provavel_contabilidade';
+  if (emailCategory === 'empresa') return 'empresa';
+  // Fallback: check email domain for patterns
+  if (email) {
+    const domain = (email.split('@')[1] || '').toLowerCase();
+    const patterns = ['contab', 'assessor', 'escritorio', 'contador', 'fiscal', 'tribut'];
+    if (patterns.some(p => domain.includes(p))) return 'contabilidade';
+  }
+  return 'empresa';
+}
 
 function loadLeads() {
   try { leads = JSON.parse(localStorage.getItem('procura-leads') || '[]'); } catch(e) { leads = []; }
+  // Migrate: add categoria to old leads
+  let migrated = false;
+  leads.forEach(l => {
+    if (!l.categoria) { l.categoria = autoCategoria(null, l.email); migrated = true; }
+  });
+  if (migrated) saveLeads();
   updateLeadsBadge();
 }
 
@@ -411,6 +525,7 @@ function addLead(data) {
     uf: data.uf || null,
     origem: data.origem || 'manual',
     valorHomologado: data.valorHomologado || null,
+    categoria: data.categoria || autoCategoria(data.emailCategory, data.email),
     adicionadoEm: new Date().toISOString()
   });
   saveLeads();
@@ -432,6 +547,41 @@ function clearLeads() {
   showToast('Todos os leads foram removidos');
 }
 
+function catBadge(cat) {
+  if (cat === 'empresa') return 'badge-green';
+  if (cat === 'provavel_contabilidade') return 'badge-yellow';
+  if (cat === 'contabilidade') return 'badge-orange';
+  return 'badge-gray';
+}
+function catLabel(cat) {
+  if (cat === 'empresa') return 'Empresa';
+  if (cat === 'provavel_contabilidade') return 'Prov. Contab.';
+  if (cat === 'contabilidade') return 'Contabilidade';
+  return 'N/D';
+}
+function toggleCategoria(cnpj) {
+  const lead = leads.find(l => l.cnpj === cnpj);
+  if (!lead) return;
+  const cycle = ['empresa','provavel_contabilidade','contabilidade'];
+  const idx = cycle.indexOf(lead.categoria);
+  lead.categoria = cycle[(idx + 1) % cycle.length];
+  saveLeads();
+  renderLeads();
+  showToast('Categoria alterada: ' + catLabel(lead.categoria));
+}
+function filterLeads(f) {
+  leadFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active','active-green','active-yellow','active-orange'));
+  const btn = document.getElementById('filter-' + f);
+  if (btn) {
+    if (f === 'empresa') btn.classList.add('active-green');
+    else if (f === 'provavel_contabilidade') btn.classList.add('active-yellow');
+    else if (f === 'contabilidade') btn.classList.add('active-orange');
+    else btn.classList.add('active');
+  }
+  renderLeads();
+}
+
 function renderLeads() {
   const statsEl = document.getElementById('leads-stats');
   const resultsEl = document.getElementById('leads-results');
@@ -439,28 +589,35 @@ function renderLeads() {
 
   const comEmail = leads.filter(l => l.email).length;
   const semEmail = leads.length - comEmail;
+  const empresas = leads.filter(l => l.categoria === 'empresa').length;
+  const provContab = leads.filter(l => l.categoria === 'provavel_contabilidade').length;
+  const contabs = leads.filter(l => l.categoria === 'contabilidade').length;
 
   statsEl.innerHTML =
     '<div class="stat"><div class="stat-value blue">' + leads.length + '</div><div class="stat-label">Total de leads</div></div>' +
     '<div class="stat"><div class="stat-value green">' + comEmail + '</div><div class="stat-label">Com email</div></div>' +
-    '<div class="stat"><div class="stat-value yellow">' + semEmail + '</div><div class="stat-label">Sem email</div></div>';
+    '<div class="stat"><div class="stat-value" style="color:#22c55e">' + empresas + '</div><div class="stat-label">Empresas</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#eab308">' + provContab + '</div><div class="stat-label">Prov. Contab.</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#f97316">' + contabs + '</div><div class="stat-label">Contabilidades</div></div>';
 
   actionsEl.style.display = leads.length > 0 ? 'flex' : 'none';
 
-  if (leads.length === 0) {
-    resultsEl.innerHTML = '<div class="results"><div class="empty">Nenhum lead adicionado ainda. Use o botao "+" nas abas de Busca de Emails, Fornecedores ou Contratos para adicionar empresas aqui.</div></div>';
+  const filtered = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<div class="results"><div class="empty">' + (leads.length === 0 ? 'Nenhum lead adicionado ainda. Use o botao "+" nas abas de Busca de Emails, Fornecedores ou Contratos.' : 'Nenhum lead nesta categoria.') + '</div></div>';
     return;
   }
 
-  let html = '<div class="results"><div class="results-header"><h3>Meus Leads (' + leads.length + ')</h3></div><div class="table-wrap"><table><thead><tr>' +
-    '<th>Empresa</th><th>Email</th><th>Telefone</th><th>Cidade/UF</th><th>Origem</th><th>Valor</th><th></th>' +
+  let html = '<div class="results"><div class="results-header"><h3>' + (leadFilter === 'todos' ? 'Todos os Leads' : catLabel(leadFilter)) + ' (' + filtered.length + ')</h3></div><div class="table-wrap"><table><thead><tr>' +
+    '<th>Empresa</th><th>Email</th><th>Categoria</th><th>Cidade/UF</th><th>Origem</th><th>Valor</th><th></th>' +
     '</tr></thead><tbody>';
 
-  leads.forEach(l => {
+  filtered.forEach(l => {
     html += '<tr>' +
       '<td><div style="font-weight:600;font-size:12px">' + (l.razaoSocial || 'Sem nome') + '</div><div style="color:#475569;font-size:11px">' + l.cnpj + '</div></td>' +
       '<td>' + (l.email ? '<a class="email-link" href="mailto:' + l.email + '">' + l.email + '</a>' : '<span class="badge badge-red">Sem email</span>') + '</td>' +
-      '<td style="font-size:12px">' + (l.telefones || '-') + '</td>' +
+      '<td><button class="badge-cat badge ' + catBadge(l.categoria) + '" onclick="toggleCategoria(\\''+l.cnpj+'\\');event.stopPropagation()" title="Clique para alterar">' + catLabel(l.categoria) + '</button></td>' +
       '<td style="font-size:12px">' + (l.municipio || '') + (l.uf ? '/' + l.uf : '') + '</td>' +
       '<td><span class="badge badge-blue">' + (l.origem || '-') + '</span></td>' +
       '<td style="font-size:12px;color:#22c55e;font-weight:600">' + money(l.valorHomologado) + '</td>' +
@@ -473,24 +630,26 @@ function renderLeads() {
 }
 
 function copyLeadEmails() {
-  const emails = leads.filter(l => l.email).map(l => l.email);
-  if (emails.length === 0) return showToast('Nenhum lead com email', true);
+  const source = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  const emails = source.filter(l => l.email).map(l => l.email);
+  if (emails.length === 0) return showToast('Nenhum lead com email' + (leadFilter !== 'todos' ? ' nesta categoria' : ''), true);
   navigator.clipboard.writeText(emails.join('\\n')).then(() => showToast(emails.length + ' emails copiados!'));
 }
 
 function exportLeadsCSV() {
-  if (leads.length === 0) return showToast('Nenhum lead para exportar', true);
-  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Origem,Valor Homologado';
-  const rows = leads.map(l => {
-    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', l.origem||'', l.valorHomologado||''].join(',');
+  const source = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  if (source.length === 0) return showToast('Nenhum lead para exportar', true);
+  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Origem,Categoria,Valor Homologado';
+  const rows = source.map(l => {
+    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', l.origem||'', l.categoria||'', l.valorHomologado||''].join(',');
   });
   const csv = header + '\\n' + rows.join('\\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'procura-leads-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'procura-leads-' + (leadFilter !== 'todos' ? leadFilter + '-' : '') + new Date().toISOString().split('T')[0] + '.csv';
   a.click();
-  showToast('CSV exportado com ' + leads.length + ' leads!');
+  showToast('CSV exportado com ' + source.length + ' leads!');
 }
 
 function addAllLeads(dataArray, origem) {
@@ -505,6 +664,7 @@ function addAllLeads(dataArray, origem) {
       cnpj, razaoSocial: f.razaoSocial||null, nomeFantasia: f.nomeFantasia||null,
       email: f.email||null, telefones: f.telefones||null, municipio: f.municipio||null,
       uf: f.uf||null, origem: origem, valorHomologado: f.valorHomologado||null,
+      categoria: autoCategoria(f.emailCategory, f.email),
       adicionadoEm: new Date().toISOString()
     });
     added++;
@@ -658,7 +818,8 @@ async function buscaEmails() {
         '<td style="font-size:12px">' + (f.telefones||'-') + '</td>' +
         '<td style="font-size:12px">' + (f.municipio||'') + (f.uf ? '/' + f.uf : '') + '</td>' +
         '<td style="font-size:12px;font-weight:600;color:#22c55e">' + money(f.valorHomologado) + '</td>' +
-        '<td><span class="badge ' + (f.emailSource === 'not_found' || f.emailSource === 'lookup_failed' ? 'badge-gray' : 'badge-blue') + '">' + f.emailSource + '</span></td>' +
+        '<td><span class="badge ' + (f.emailSource === 'not_found' || f.emailSource === 'lookup_failed' ? 'badge-gray' : 'badge-blue') + '">' + f.emailSource + '</span>' +
+        (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange" title="Confirmado contabilidade (dominio)">CONTAB</span>' : f.emailCategory === 'provavel_contabilidade' ? ' <span class="badge badge-yellow" title="Provavel contabilidade (ReceitaWS)">PROV. CONTAB</span>' : '') + '</td>' +
         '<td><button class="btn-add' + (isInLeads ? ' added' : '') + '" onclick="addLeadFromBusca(' + i + ',this)" title="Adicionar aos Meus Leads">' + (isInLeads ? '\\u2713' : '+') + '</button></td>' +
         '</tr>';
     });
@@ -862,7 +1023,8 @@ async function searchFornecedores() {
           '<div class="item"><label>Cidade/UF</label><span>' + (f.municipio||'') + (f.uf ? '/' + f.uf : '') + '</span></div>' +
           '<div class="item"><label>Porte</label><span>' + (f.porte||'-') + '</span></div>' +
           '<div class="item"><label>Valor Homologado</label><span style="color:#22c55e;font-weight:600">' + money(f.valorHomologado) + '</span></div>' +
-          '<div class="item"><label>Fonte do Email</label><span><span class="badge badge-blue">' + f.emailSource + '</span></span></div>' +
+          '<div class="item"><label>Fonte do Email</label><span><span class="badge badge-blue">' + f.emailSource + '</span>' +
+            (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange">CONTAB</span>' : f.emailCategory === 'provavel_contabilidade' ? ' <span class="badge badge-yellow">PROV. CONTAB</span>' : '') + '</span></div>' +
           '<div class="item"><label>Itens Fornecidos</label><span style="font-size:11px;color:#94a3b8">' + (f.itemDescricao||'-').substring(0,200) + '</span></div>' +
         '</div>' +
       '</div>';
@@ -1009,6 +1171,205 @@ async function lookupCnpj() {
   }
 }
 
+// ============ GMAIL ============
+let gmailAccount = null;
+let gmailTemplates = [];
+let gmailLoaded = false;
+
+async function apiPost(url, body) {
+  const res = await fetch(API + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro ' + res.status); }
+  return res.json();
+}
+async function apiPut(url, body) {
+  const res = await fetch(API + url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro ' + res.status); }
+  return res.json();
+}
+async function apiDelete(url) {
+  const res = await fetch(API + url, { method: 'DELETE' });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Erro ' + res.status); }
+  return res.json();
+}
+
+async function loadGmailStatus() {
+  try {
+    const data = await apiFetch('/api/gmail/status');
+    if (!data.configured) {
+      document.getElementById('gmail-not-configured').style.display = 'block';
+      document.getElementById('gmail-connect-section').style.display = 'none';
+      document.getElementById('gmail-account-section').style.display = 'none';
+      return;
+    }
+    document.getElementById('gmail-not-configured').style.display = 'none';
+    const active = data.accounts.find(a => a.isActive);
+    if (active) {
+      gmailAccount = active;
+      document.getElementById('gmail-connect-section').style.display = 'none';
+      document.getElementById('gmail-account-section').style.display = 'block';
+      document.getElementById('gmail-account-name').textContent = active.displayName || active.email;
+      document.getElementById('gmail-account-email').textContent = active.email;
+      document.getElementById('gmail-account-quota').textContent = (active.dailySentCount || 0) + ' / 450 emails enviados hoje';
+      document.getElementById('gmail-disconnect-btn').onclick = () => disconnectGmail(active.id);
+    } else {
+      document.getElementById('gmail-connect-section').style.display = 'block';
+      document.getElementById('gmail-account-section').style.display = 'none';
+    }
+    await loadTemplates();
+    updateSendPreview();
+  } catch(e) {
+    document.getElementById('gmail-status-box').innerHTML = '<strong>Erro:</strong> ' + e.message;
+  }
+}
+
+async function disconnectGmail(id) {
+  if (!confirm('Desconectar conta Gmail?')) return;
+  await apiDelete('/api/gmail/accounts/' + id);
+  gmailAccount = null;
+  await loadGmailStatus();
+  showToast('Gmail desconectado');
+}
+
+async function loadTemplates() {
+  gmailTemplates = await apiFetch('/api/gmail/templates');
+  renderTemplatesList();
+  updateSendTemplateSelect();
+}
+
+function renderTemplatesList() {
+  const el = document.getElementById('gmail-templates-list');
+  if (gmailTemplates.length === 0) {
+    el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px">Nenhum template criado ainda.</div>';
+    return;
+  }
+  let html = '';
+  gmailTemplates.forEach(t => {
+    const catText = t.targetCategory ? catLabel(t.targetCategory) : 'Todos';
+    html += '<div class="card" style="margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+        '<div><strong style="color:#f8fafc">' + t.name + '</strong> <span class="badge badge-blue" style="font-size:10px">' + catText + '</span>' +
+        '<div style="color:#64748b;font-size:12px;margin-top:2px">Assunto: ' + t.subject + '</div></div>' +
+        '<div style="display:flex;gap:6px">' +
+          '<button class="btn btn-primary btn-xs" onclick="editTemplate(' + t.id + ')">Editar</button>' +
+          '<button class="btn btn-red btn-xs" onclick="deleteTemplate(' + t.id + ')">Excluir</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function updateSendTemplateSelect() {
+  const sel = document.getElementById('gmail-send-template');
+  sel.innerHTML = '<option value="">Selecione um template</option>' +
+    gmailTemplates.map(t => '<option value="' + t.id + '">' + t.name + (t.targetCategory ? ' (' + catLabel(t.targetCategory) + ')' : '') + '</option>').join('');
+}
+
+function updateSendPreview() {
+  const filter = document.getElementById('gmail-send-filter')?.value || 'todos';
+  const eligible = leads.filter(l => {
+    if (!l.email) return false;
+    if (filter === 'todos') return true;
+    return l.categoria === filter;
+  });
+  const el = document.getElementById('gmail-send-preview');
+  if (el) el.textContent = eligible.length + ' leads com email serao enviados';
+}
+
+function showTemplateForm(id) {
+  document.getElementById('gmail-template-form').style.display = 'block';
+  document.getElementById('tpl-edit-id').value = id || '';
+  if (id) {
+    const t = gmailTemplates.find(x => x.id === id);
+    if (t) {
+      document.getElementById('tpl-name').value = t.name;
+      document.getElementById('tpl-subject').value = t.subject;
+      document.getElementById('tpl-body').value = t.body;
+      document.getElementById('tpl-category').value = t.targetCategory || '';
+    }
+  } else {
+    document.getElementById('tpl-name').value = '';
+    document.getElementById('tpl-subject').value = '';
+    document.getElementById('tpl-body').value = '';
+    document.getElementById('tpl-category').value = '';
+  }
+}
+
+function hideTemplateForm() {
+  document.getElementById('gmail-template-form').style.display = 'none';
+}
+
+async function saveTemplate() {
+  const id = document.getElementById('tpl-edit-id').value;
+  const name = document.getElementById('tpl-name').value.trim();
+  const subject = document.getElementById('tpl-subject').value.trim();
+  const body = document.getElementById('tpl-body').value.trim();
+  const targetCategory = document.getElementById('tpl-category').value;
+  if (!name || !subject || !body) return showToast('Preencha nome, assunto e corpo', true);
+  try {
+    if (id) {
+      await apiPut('/api/gmail/templates/' + id, { name, subject, body, targetCategory });
+      showToast('Template atualizado!');
+    } else {
+      await apiPost('/api/gmail/templates', { name, subject, body, targetCategory });
+      showToast('Template criado!');
+    }
+    hideTemplateForm();
+    await loadTemplates();
+  } catch(e) { showToast(e.message, true); }
+}
+
+function editTemplate(id) { showTemplateForm(id); }
+
+async function deleteTemplate(id) {
+  if (!confirm('Excluir este template?')) return;
+  await apiDelete('/api/gmail/templates/' + id);
+  await loadTemplates();
+  showToast('Template excluido');
+}
+
+async function sendGmailEmails() {
+  if (!gmailAccount) return showToast('Conecte uma conta Gmail primeiro', true);
+  const templateId = document.getElementById('gmail-send-template').value;
+  if (!templateId) return showToast('Selecione um template', true);
+  const filter = document.getElementById('gmail-send-filter').value;
+  const eligible = leads.filter(l => {
+    if (!l.email) return false;
+    if (filter === 'todos') return true;
+    return l.categoria === filter;
+  });
+  if (eligible.length === 0) return showToast('Nenhum lead com email nesta categoria', true);
+  if (!confirm('Enviar email para ' + eligible.length + ' leads?')) return;
+
+  const btn = document.getElementById('gmail-send-btn');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  try {
+    const payload = {
+      accountId: gmailAccount.id,
+      templateId: Number(templateId),
+      leads: eligible.map(l => ({
+        email: l.email, cnpj: l.cnpj,
+        empresa: l.razaoSocial || l.nomeFantasia || '',
+        contato: l.razaoSocial || '',
+        valor: l.valorHomologado ? money(l.valorHomologado) : '',
+        cidade: l.municipio || '', uf: l.uf || ''
+      }))
+    };
+    const data = await apiPost('/api/gmail/send', payload);
+    document.getElementById('gmail-send-results').innerHTML =
+      '<div class="info-box success"><strong>' + data.successCount + '</strong> emails enviados, <strong>' + data.failCount + '</strong> falharam de <strong>' + data.total + '</strong> total</div>';
+    await loadGmailStatus();
+  } catch(e) {
+    showToast('Erro ao enviar: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enviar';
+  }
+}
+
+// Update preview when filter changes
+document.getElementById('gmail-send-filter')?.addEventListener('change', updateSendPreview);
+
 // ============ INIT ============
 // Enter key support
 document.getElementById('be-q').addEventListener('keydown', e => { if(e.key==='Enter') buscaEmails(); });
@@ -1018,7 +1379,7 @@ document.getElementById('cnpj-input').addEventListener('keydown', e => { if(e.ke
 // Escape to close modal
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeLicModal(); });
 
-// Auto-load licitacoes when tab is clicked
+// Auto-load tabs when clicked
 let licLoaded = false;
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -1027,11 +1388,26 @@ document.querySelectorAll('.tab').forEach(tab => {
       licPage = 1;
       searchLicitacoes();
     }
+    if (tab.dataset.tab === 'gmail' && !gmailLoaded) {
+      gmailLoaded = true;
+      loadGmailStatus();
+    }
   });
 });
 
 // Load leads from localStorage on startup
 loadLeads();
+
+// Check for Gmail OAuth redirect
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('gmail') === 'success') {
+  showToast('Gmail conectado: ' + urlParams.get('email'));
+  history.replaceState({}, '', '/');
+  setTimeout(() => { switchTab('gmail'); gmailLoaded = true; loadGmailStatus(); }, 100);
+} else if (urlParams.get('gmail') === 'error') {
+  showToast('Erro Gmail: ' + urlParams.get('msg'), true);
+  history.replaceState({}, '', '/');
+}
 </script>
 </body>
 </html>`;

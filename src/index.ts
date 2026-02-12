@@ -9,6 +9,7 @@ import { contratosRoutes } from "./routes/contratos.routes.js";
 import { fornecedoresRoutes } from "./routes/fornecedores.routes.js";
 import { dashboardRoutes } from "./routes/dashboard.routes.js";
 import { buscaEmailsRoutes } from "./routes/busca-emails.routes.js";
+import { gmailRoutes } from "./routes/gmail.routes.js";
 
 const app = Fastify({
   logger: false,
@@ -27,6 +28,7 @@ await app.register(licitacoesRoutes);
 await app.register(contratosRoutes);
 await app.register(fornecedoresRoutes);
 await app.register(buscaEmailsRoutes);
+await app.register(gmailRoutes);
 await app.register(dashboardRoutes);
 
 // Global error handler

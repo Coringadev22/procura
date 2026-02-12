@@ -96,4 +96,5 @@ export interface CnpjData {
   cnaePrincipal: string | null;
   situacaoCadastral: string | null;
   emailSource: "brasilapi" | "cnpja" | "receitaws" | "cnpjws" | "not_found" | "lookup_failed";
+  emailCategory: "empresa" | "provavel_contabilidade" | "contabilidade";
 }
