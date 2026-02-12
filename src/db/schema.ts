@@ -175,6 +175,25 @@ export const automationJobs = pgTable("automation_jobs", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+// Leads (saved suppliers from searches)
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  cnpj: text("cnpj").notNull().unique(),
+  razaoSocial: text("razao_social"),
+  nomeFantasia: text("nome_fantasia"),
+  email: text("email"),
+  telefones: text("telefones"),
+  municipio: text("municipio"),
+  uf: text("uf"),
+  cnaePrincipal: text("cnae_principal"),
+  origem: text("origem").notNull().default("manual"),
+  valorHomologado: real("valor_homologado"),
+  categoria: text("categoria").notNull().default("empresa"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 // Automation run log
 export const automationRunLog = pgTable("automation_run_log", {
   id: serial("id").primaryKey(),

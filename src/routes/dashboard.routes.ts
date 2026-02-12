@@ -250,7 +250,7 @@ const HTML = `<!DOCTYPE html>
     <!-- ============ MEUS LEADS ============ -->
     <div class="panel" id="panel-leads">
       <div class="info-box success">
-        <strong>Meus Leads:</strong> Aqui ficam os fornecedores que voce selecionou das buscas. Use o botao "+" nas abas de Busca de Emails, Fornecedores e Contratos para adicionar empresas aqui. Os dados ficam salvos no seu navegador (localStorage) e persistem entre sessoes. CNPJs ou emails duplicados nao sao adicionados.
+        <strong>Meus Leads:</strong> Aqui ficam os fornecedores que voce selecionou das buscas. Use o botao "+" nas abas de Busca de Emails, Fornecedores e Contratos para adicionar empresas aqui. Os dados ficam salvos no banco de dados e acessiveis de qualquer dispositivo. CNPJs ou emails duplicados nao sao adicionados.
       </div>
 
       <div id="leads-stats" class="stats"></div>
@@ -579,7 +579,7 @@ const API = '';
 let licPage = 1;
 let contPage = 1;
 
-// ============ LEADS (localStorage) ============
+// ============ LEADS (banco de dados) ============
 let leads = [];
 let leadFilter = 'todos';
 
@@ -587,7 +587,6 @@ function autoCategoria(emailCategory, email) {
   if (emailCategory === 'contabilidade') return 'contabilidade';
   if (emailCategory === 'provavel_contabilidade') return 'provavel_contabilidade';
   if (emailCategory === 'empresa') return 'empresa';
-  // Fallback: check email domain for patterns
   if (email) {
     const domain = (email.split('@')[1] || '').toLowerCase();
     const patterns = ['contab', 'assessor', 'escritorio', 'contador', 'fiscal', 'tribut'];
@@ -596,20 +595,12 @@ function autoCategoria(emailCategory, email) {
   return 'empresa';
 }
 
-function loadLeads() {
-  try { leads = JSON.parse(localStorage.getItem('procura-leads') || '[]'); } catch(e) { leads = []; }
-  // Migrate: add categoria to old leads
-  let migrated = false;
-  leads.forEach(l => {
-    if (!l.categoria) { l.categoria = autoCategoria(null, l.email); migrated = true; }
-  });
-  if (migrated) saveLeads();
-  updateLeadsBadge();
-}
-
-function saveLeads() {
-  localStorage.setItem('procura-leads', JSON.stringify(leads));
-  updateLeadsBadge();
+async function loadLeads() {
+  try {
+    leads = await apiFetch('/api/leads');
+    updateLeadsBadge();
+    if (document.getElementById('panel-leads')?.classList.contains('active')) renderLeads();
+  } catch(e) { leads = []; }
 }
 
 function updateLeadsBadge() {
@@ -617,51 +608,48 @@ function updateLeadsBadge() {
   if (badge) badge.textContent = leads.length;
 }
 
-function addLead(data) {
+async function addLead(data) {
   const cnpj = (data.cnpj || '').replace(/\\D/g, '');
   if (!cnpj) return showToast('CNPJ invalido', true);
-
-  // Check duplicate CNPJ
-  if (leads.some(l => l.cnpj === cnpj)) {
-    showToast('CNPJ ' + cnpj + ' ja esta nos Meus Leads', false, true);
+  try {
+    await apiPost('/api/leads', {
+      cnpj,
+      razaoSocial: data.razaoSocial || null,
+      nomeFantasia: data.nomeFantasia || null,
+      email: data.email || null,
+      telefones: data.telefones || null,
+      municipio: data.municipio || null,
+      uf: data.uf || null,
+      cnaePrincipal: data.cnaePrincipal || null,
+      origem: data.origem || 'manual',
+      valorHomologado: data.valorHomologado || null,
+      categoria: data.categoria || autoCategoria(data.emailCategory, data.email),
+    });
+    await loadLeads();
+    showToast('Adicionado aos Meus Leads!');
+    return true;
+  } catch(e) {
+    if (e.message && e.message.includes('duplicado')) {
+      showToast('Lead ja existe nos Meus Leads', false, true);
+    } else if (e.message && e.message.includes('ja existe')) {
+      showToast(e.message, false, true);
+    } else {
+      showToast('Erro ao adicionar lead: ' + e.message, true);
+    }
     return false;
   }
-
-  // Check duplicate email
-  if (data.email && leads.some(l => l.email && l.email.toLowerCase() === data.email.toLowerCase())) {
-    showToast('Email ' + data.email + ' ja existe nos Meus Leads (outro CNPJ)', false, true);
-    return false;
-  }
-
-  leads.push({
-    cnpj: cnpj,
-    razaoSocial: data.razaoSocial || null,
-    nomeFantasia: data.nomeFantasia || null,
-    email: data.email || null,
-    telefones: data.telefones || null,
-    municipio: data.municipio || null,
-    uf: data.uf || null,
-    cnaePrincipal: data.cnaePrincipal || null,
-    origem: data.origem || 'manual',
-    valorHomologado: data.valorHomologado || null,
-    categoria: data.categoria || autoCategoria(data.emailCategory, data.email),
-    adicionadoEm: new Date().toISOString()
-  });
-  saveLeads();
-  showToast('Adicionado aos Meus Leads!');
-  return true;
 }
 
-function removeLead(cnpj) {
-  leads = leads.filter(l => l.cnpj !== cnpj);
-  saveLeads();
+async function removeLead(cnpj) {
+  await apiDelete('/api/leads/' + cnpj);
+  await loadLeads();
   renderLeads();
 }
 
-function clearLeads() {
+async function clearLeads() {
   if (!confirm('Tem certeza que deseja limpar todos os leads? Esta acao nao pode ser desfeita.')) return;
-  leads = [];
-  saveLeads();
+  await apiDelete('/api/leads');
+  await loadLeads();
   renderLeads();
   showToast('Todos os leads foram removidos');
 }
@@ -678,15 +666,18 @@ function catLabel(cat) {
   if (cat === 'contabilidade') return 'Contabilidade';
   return 'N/D';
 }
-function toggleCategoria(cnpj) {
-  const lead = leads.find(l => l.cnpj === cnpj);
-  if (!lead) return;
-  const cycle = ['empresa','provavel_contabilidade','contabilidade'];
-  const idx = cycle.indexOf(lead.categoria);
-  lead.categoria = cycle[(idx + 1) % cycle.length];
-  saveLeads();
-  renderLeads();
-  showToast('Categoria alterada: ' + catLabel(lead.categoria));
+async function toggleCategoria(cnpj) {
+  try {
+    const res = await fetch('/api/leads/' + cnpj + '/categoria', { method: 'PATCH' });
+    const data = await res.json();
+    if (data.success) {
+      const lead = leads.find(l => l.cnpj === cnpj);
+      if (lead) lead.categoria = data.categoria;
+      renderLeads();
+      updateLeadsBadge();
+      showToast('Categoria alterada: ' + catLabel(data.categoria));
+    }
+  } catch(e) { showToast('Erro ao alterar categoria', true); }
 }
 function filterLeads(f) {
   leadFilter = f;
@@ -707,7 +698,6 @@ function renderLeads() {
   const actionsEl = document.getElementById('leads-actions');
 
   const comEmail = leads.filter(l => l.email).length;
-  const semEmail = leads.length - comEmail;
   const empresas = leads.filter(l => l.categoria === 'empresa').length;
   const provContab = leads.filter(l => l.categoria === 'provavel_contabilidade').length;
   const contabs = leads.filter(l => l.categoria === 'contabilidade').length;
@@ -775,27 +765,27 @@ function exportLeadsCSV() {
   showToast('CSV exportado com ' + source.length + ' leads!');
 }
 
-function addAllLeads(dataArray, origem) {
-  let added = 0;
-  let dupes = 0;
-  dataArray.forEach(f => {
-    const cnpj = (f.cnpj || '').replace(/\\D/g, '');
-    if (!cnpj) return;
-    if (leads.some(l => l.cnpj === cnpj)) { dupes++; return; }
-    if (f.email && leads.some(l => l.email && l.email.toLowerCase() === f.email.toLowerCase())) { dupes++; return; }
-    leads.push({
-      cnpj, razaoSocial: f.razaoSocial||null, nomeFantasia: f.nomeFantasia||null,
-      email: f.email||null, telefones: f.telefones||null, municipio: f.municipio||null,
-      uf: f.uf||null, cnaePrincipal: f.cnaePrincipal||null, origem: origem,
-      valorHomologado: f.valorHomologado||null,
-      categoria: autoCategoria(f.emailCategory, f.email),
-      adicionadoEm: new Date().toISOString()
-    });
-    added++;
-  });
-  saveLeads();
-  if (added > 0) showToast(added + ' leads adicionados!' + (dupes > 0 ? ' (' + dupes + ' duplicados ignorados)' : ''));
-  else if (dupes > 0) showToast('Todos ' + dupes + ' ja estavam nos Meus Leads', false, true);
+async function addAllLeads(dataArray, origem) {
+  const items = dataArray.map(f => ({
+    cnpj: (f.cnpj || '').replace(/\\D/g, ''),
+    razaoSocial: f.razaoSocial || null,
+    nomeFantasia: f.nomeFantasia || null,
+    email: f.email || null,
+    telefones: f.telefones || null,
+    municipio: f.municipio || null,
+    uf: f.uf || null,
+    cnaePrincipal: f.cnaePrincipal || null,
+    origem: origem,
+    valorHomologado: f.valorHomologado || null,
+    categoria: autoCategoria(f.emailCategory, f.email),
+  })).filter(i => i.cnpj);
+
+  try {
+    const res = await apiPost('/api/leads/batch', { leads: items });
+    await loadLeads();
+    if (res.added > 0) showToast(res.added + ' leads adicionados!' + (res.skipped > 0 ? ' (' + res.skipped + ' duplicados ignorados)' : ''));
+    else if (res.skipped > 0) showToast('Todos ' + res.skipped + ' ja estavam nos Meus Leads', false, true);
+  } catch(e) { showToast('Erro ao adicionar leads: ' + e.message, true); }
 }
 
 // ============ UTILITIES ============
@@ -969,10 +959,10 @@ async function buscaEmails() {
   }
 }
 
-function addLeadFromBusca(index, btnEl) {
+async function addLeadFromBusca(index, btnEl) {
   const f = lastBuscaData[index];
   if (!f) return;
-  const ok = addLead({ ...f, origem: 'busca-emails' });
+  const ok = await addLead({ ...f, origem: 'busca-emails' });
   if (ok && btnEl) { btnEl.textContent = '\\u2713'; btnEl.classList.add('added'); }
 }
 
@@ -1171,10 +1161,10 @@ async function searchFornecedores() {
   }
 }
 
-function addLeadFromForn(index, btnEl) {
+async function addLeadFromForn(index, btnEl) {
   const f = lastFornData[index];
   if (!f) return;
-  const ok = addLead({ ...f, origem: 'fornecedores' });
+  const ok = await addLead({ ...f, origem: 'fornecedores' });
   if (ok && btnEl) { btnEl.textContent = '\\u2713'; btnEl.classList.add('added'); }
 }
 
@@ -1244,7 +1234,7 @@ async function addContractLead(cnpj, nome, valor, uf, btnEl) {
     if (btnEl) { btnEl.textContent = '...'; btnEl.disabled = true; }
     const data = await apiFetch('/api/fornecedores/' + cnpj);
     const f = data.data;
-    const ok = addLead({
+    const ok = await addLead({
       cnpj: cnpj, razaoSocial: f.razaoSocial || nome, nomeFantasia: f.nomeFantasia,
       email: f.email, telefones: f.telefones, municipio: f.municipio,
       uf: f.uf || uf, origem: 'contratos', valorHomologado: valor
@@ -1253,7 +1243,7 @@ async function addContractLead(cnpj, nome, valor, uf, btnEl) {
     else if (btnEl) { btnEl.textContent = '+'; btnEl.disabled = false; }
   } catch(e) {
     // Add without email
-    addLead({ cnpj, razaoSocial: nome, uf, origem: 'contratos', valorHomologado: valor });
+    await addLead({ cnpj, razaoSocial: nome, uf, origem: 'contratos', valorHomologado: valor });
     if (btnEl) { btnEl.textContent = '\\u2713'; btnEl.classList.add('added'); }
   }
 }
@@ -1793,7 +1783,7 @@ document.getElementById('cnpj-input').addEventListener('keydown', e => { if(e.ke
 // Escape to close modals
 document.addEventListener('keydown', e => { if(e.key==='Escape') { closeLicModal(); closeTestModal(); } });
 
-// Load leads from localStorage on startup
+// Load leads from database on startup
 loadLeads();
 
 // Check for Gmail OAuth redirect

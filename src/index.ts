@@ -11,6 +11,7 @@ import { dashboardRoutes } from "./routes/dashboard.routes.js";
 import { buscaEmailsRoutes } from "./routes/busca-emails.routes.js";
 import { gmailRoutes } from "./routes/gmail.routes.js";
 import { automationRoutes } from "./routes/automation.routes.js";
+import { leadsRoutes } from "./routes/leads.routes.js";
 import { startAutomationScheduler, cancelAllJobs } from "./services/automation.service.js";
 
 const app = Fastify({
@@ -32,6 +33,7 @@ await app.register(fornecedoresRoutes);
 await app.register(buscaEmailsRoutes);
 await app.register(gmailRoutes);
 await app.register(automationRoutes);
+await app.register(leadsRoutes);
 await app.register(dashboardRoutes);
 
 // Global error handler
