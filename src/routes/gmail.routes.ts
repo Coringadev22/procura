@@ -219,4 +219,71 @@ export async function gmailRoutes(app: FastifyInstance) {
 
     return { data: logs, page, pageSize };
   });
+
+  // ============ TEST EMAIL ============
+
+  // Send test email
+  app.post<{
+    Body: {
+      accountId: number;
+      templateId: number;
+      testEmail: string;
+    };
+  }>("/api/gmail/send-test", async (request) => {
+    const { accountId, templateId, testEmail } = request.body;
+
+    const testVars: Record<string, string> = {
+      empresa: "Empresa Teste LTDA",
+      cnpj: "12.345.678/0001-90",
+      email: testEmail,
+      contato: "Joao da Silva",
+      valor: "R$ 150.000,00",
+      cidade: "Sao Paulo",
+      uf: "SP",
+    };
+
+    const result = await sendEmail(
+      accountId,
+      templateId,
+      testEmail,
+      "12345678000190",
+      testVars
+    );
+
+    return { success: result.success, error: result.error };
+  });
+
+  // Preview template (no send)
+  app.post<{
+    Body: { templateId: number };
+  }>("/api/gmail/preview-template", async (request) => {
+    const { templateId } = request.body;
+
+    const template = db
+      .select()
+      .from(emailTemplates)
+      .where(eq(emailTemplates.id, templateId))
+      .get();
+    if (!template) return { error: "Template nao encontrado" };
+
+    const vars: Record<string, string> = {
+      empresa: "Empresa Teste LTDA",
+      cnpj: "12.345.678/0001-90",
+      email: "teste@empresa.com",
+      contato: "Joao da Silva",
+      valor: "R$ 150.000,00",
+      cidade: "Sao Paulo",
+      uf: "SP",
+    };
+
+    const { renderTemplate } = await import("../services/gmail.service.js");
+    const renderedSubject = renderTemplate(template.subject, vars);
+    const renderedBody = renderTemplate(template.body, vars);
+
+    return {
+      subject: renderedSubject,
+      body: renderedBody,
+      templateName: template.name,
+    };
+  });
 }

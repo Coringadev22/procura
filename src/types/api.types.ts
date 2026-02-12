@@ -34,6 +34,7 @@ export interface FornecedorComEmail {
   municipio: string | null;
   uf: string | null;
   porte: string | null;
+  cnaePrincipal: string | null;
   valorHomologado?: number | null;
   itemDescricao?: string | null;
 }

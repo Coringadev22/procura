@@ -124,6 +124,7 @@ export async function enrichLicitacao(
       municipio: data.municipio,
       uf: data.uf,
       porte: relatedResults[0]?.porteFornecedorNome ?? null,
+      cnaePrincipal: data.cnaePrincipal,
       valorHomologado: relatedResults.reduce(
         (sum, r) => sum + (r.valorTotalHomologado ?? 0),
         0

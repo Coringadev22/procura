@@ -10,19 +10,27 @@ const HTML = `<!DOCTYPE html>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
 
-    .header { background: linear-gradient(135deg, #1e293b, #334155); padding: 28px 32px; border-bottom: 1px solid #475569; }
-    .header h1 { font-size: 26px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 10px; }
-    .header h1 span { background: #22c55e; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 600; }
-    .header p { color: #94a3b8; font-size: 14px; margin-top: 6px; max-width: 700px; line-height: 1.5; }
-
-    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-
-    .tabs { display: flex; gap: 4px; margin-bottom: 24px; flex-wrap: wrap; background: #1e293b; border-radius: 12px; padding: 4px; border: 1px solid #334155; }
-    .tab { padding: 10px 18px; border-radius: 8px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; border: none; display: flex; align-items: center; gap: 6px; }
-    .tab:hover { color: #e2e8f0; background: #334155; }
-    .tab.active { background: #3b82f6; color: #fff; font-weight: 600; }
-    .tab.tab-green.active { background: #22c55e; }
-    .tab-badge { background: rgba(255,255,255,0.2); color: #fff; font-size: 10px; padding: 1px 7px; border-radius: 99px; font-weight: 700; }
+    .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar { background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-right: 1px solid #334155; display: flex; flex-direction: column; position: fixed; left: 0; top: 0; bottom: 0; width: 260px; z-index: 100; overflow-y: auto; }
+    .sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid #334155; }
+    .sidebar-logo h1 { font-size: 22px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px; }
+    .sidebar-logo h1 span { background: #22c55e; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+    .sidebar-logo p { color: #475569; font-size: 11px; margin-top: 4px; }
+    .sidebar-nav { flex: 1; padding: 12px 8px; }
+    .sidebar-section { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; padding: 16px 12px 6px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; margin-bottom: 2px; border: none; background: transparent; width: 100%; text-align: left; }
+    .nav-item:hover { color: #e2e8f0; background: #334155; }
+    .nav-item.active { background: #3b82f6; color: #fff; font-weight: 600; }
+    .nav-item.active-green { background: #22c55e; color: #fff; font-weight: 600; }
+    .nav-item.active-purple { background: #8b5cf6; color: #fff; font-weight: 600; }
+    .nav-item.active-amber { background: #f59e0b; color: #000; font-weight: 600; }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+    .nav-badge { margin-left: auto; background: rgba(255,255,255,0.15); color: #fff; font-size: 10px; padding: 1px 7px; border-radius: 99px; font-weight: 700; }
+    .sidebar-footer { padding: 12px 20px; border-top: 1px solid #334155; font-size: 11px; color: #475569; }
+    .main-content { margin-left: 260px; padding: 24px 32px; min-height: 100vh; max-width: 1460px; }
+    .mobile-header { display: none; position: fixed; top: 0; left: 0; right: 0; background: #1e293b; padding: 12px 16px; z-index: 200; border-bottom: 1px solid #334155; align-items: center; justify-content: space-between; }
+    .hamburger { background: none; border: none; color: #e2e8f0; font-size: 24px; cursor: pointer; padding: 4px; }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
 
     .panel { display: none; }
     .panel.active { display: block; }
@@ -94,7 +102,6 @@ const HTML = `<!DOCTYPE html>
     .filter-btn.active-green { background: #22c55e; color: #fff; border-color: #22c55e; }
     .filter-btn.active-yellow { background: #eab308; color: #000; border-color: #eab308; }
     .filter-btn.active-orange { background: #f97316; color: #fff; border-color: #f97316; }
-    .tab.tab-purple.active { background: #8b5cf6; }
 
     .email-link { color: #3b82f6; text-decoration: none; }
     .email-link:hover { text-decoration: underline; }
@@ -136,6 +143,14 @@ const HTML = `<!DOCTYPE html>
     /* Actions bar */
     .actions-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
+    @media (max-width: 768px) {
+      .app-layout { grid-template-columns: 1fr; }
+      .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-overlay.show { display: block; }
+      .mobile-header { display: flex; }
+      .main-content { margin-left: 0; padding: 72px 16px 24px; }
+    }
     @media (max-width: 640px) {
       .form-row { flex-direction: column; }
       .form-group { min-width: 100%; }
@@ -145,21 +160,37 @@ const HTML = `<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Procura <span>v3.0</span></h1>
-    <p>Plataforma para busca de emails de empresas participantes de licitacoes do governo brasileiro. Os dados vem do PNCP (Portal Nacional de Contratacoes Publicas) e os emails sao obtidos via consulta de CNPJ na Receita Federal.</p>
+  <div class="mobile-header">
+    <button class="hamburger" onclick="toggleSidebar()">&#9776;</button>
+    <span style="font-weight:700;font-size:16px;color:#f8fafc">Procura</span>
+    <span></span>
   </div>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-  <div class="container">
-    <div class="tabs">
-      <div class="tab tab-green active" data-tab="emails">Busca de Emails</div>
-      <div class="tab tab-green" data-tab="leads">Meus Leads <span class="tab-badge" id="leads-count">0</span></div>
-      <div class="tab" data-tab="licitacoes">Explorar Licitacoes</div>
-      <div class="tab" data-tab="fornecedores">Fornecedores</div>
-      <div class="tab" data-tab="contratos">Contratos</div>
-      <div class="tab" data-tab="cnpj">Consulta CNPJ</div>
-      <div class="tab tab-purple" data-tab="gmail">Gmail / Email</div>
-    </div>
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <h1>Procura <span>v3.1</span></h1>
+        <p>Licitacoes + Emails + Automacao</p>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section">Prospectar</div>
+        <button class="nav-item active-green" data-tab="emails" data-active-class="active-green" onclick="switchTab('emails')"><span class="nav-icon">&#128269;</span> Busca de Emails</button>
+        <button class="nav-item" data-tab="leads" data-active-class="active-green" onclick="switchTab('leads')"><span class="nav-icon">&#128101;</span> Meus Leads <span class="nav-badge" id="leads-count">0</span></button>
+
+        <div class="sidebar-section">Dados PNCP</div>
+        <button class="nav-item" data-tab="licitacoes" data-active-class="active" onclick="switchTab('licitacoes')"><span class="nav-icon">&#128203;</span> Licitacoes</button>
+        <button class="nav-item" data-tab="fornecedores" data-active-class="active" onclick="switchTab('fornecedores')"><span class="nav-icon">&#127970;</span> Fornecedores</button>
+        <button class="nav-item" data-tab="contratos" data-active-class="active" onclick="switchTab('contratos')"><span class="nav-icon">&#128196;</span> Contratos</button>
+        <button class="nav-item" data-tab="cnpj" data-active-class="active" onclick="switchTab('cnpj')"><span class="nav-icon">&#128270;</span> Consulta CNPJ</button>
+
+        <div class="sidebar-section">Comunicacao</div>
+        <button class="nav-item" data-tab="gmail" data-active-class="active-purple" onclick="switchTab('gmail')"><span class="nav-icon">&#9993;</span> Gmail / Email</button>
+        <button class="nav-item" data-tab="automacao" data-active-class="active-amber" onclick="switchTab('automacao')"><span class="nav-icon">&#9889;</span> Automacao</button>
+      </nav>
+      <div class="sidebar-footer">v3.1 — Dados do PNCP</div>
+    </aside>
+    <main class="main-content">
 
     <!-- ============ BUSCA DE EMAILS ============ -->
     <div class="panel active" id="panel-emails">
@@ -228,6 +259,8 @@ const HTML = `<!DOCTYPE html>
         <button class="filter-btn" id="filter-empresa" onclick="filterLeads('empresa')">Empresas</button>
         <button class="filter-btn" id="filter-provavel_contabilidade" onclick="filterLeads('provavel_contabilidade')">Prov. Contab.</button>
         <button class="filter-btn" id="filter-contabilidade" onclick="filterLeads('contabilidade')">Contabilidades</button>
+        <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
+        <input type="text" id="leads-cnae-filter" placeholder="Filtrar por CNAE / Atividade..." oninput="renderLeads()" style="padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px;width:200px">
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <button class="btn btn-green btn-sm" onclick="copyLeadEmails()">Copiar Emails</button>
         <button class="btn btn-primary btn-sm" onclick="exportLeadsCSV()">Exportar CSV</button>
@@ -442,6 +475,91 @@ const HTML = `<!DOCTYPE html>
 
       <div style="margin-top:20px" id="gmail-history"></div>
     </div>
+
+    <!-- ============ AUTOMACAO ============ -->
+    <div class="panel" id="panel-automacao">
+      <div class="info-box" style="border-left-color:#f59e0b">
+        <strong>Automacao:</strong> Configure jobs que buscam automaticamente emails de licitacoes e enviam templates por email em intervalos regulares. Cada job roda de forma independente com sua propria configuracao de busca, template e filtros.
+      </div>
+
+      <div id="auto-status" class="stats"></div>
+
+      <div class="search-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Jobs de Automacao</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="showTestEmailModal()">Testar Email</button>
+            <button class="btn btn-green btn-sm" onclick="showAutoJobForm()">Novo Job</button>
+          </div>
+        </div>
+
+        <div id="auto-job-form" style="display:none;margin-bottom:16px;padding:16px;background:#0f172a;border-radius:10px;border:1px solid #334155">
+          <input type="hidden" id="auto-edit-id" value="">
+          <div class="form-row">
+            <div class="form-group" style="flex:2"><label>Nome do Job</label><input type="text" id="auto-name" placeholder="Ex: Busca diaria informatica SP"></div>
+            <div class="form-group" style="flex:0.8"><label>Intervalo</label><select id="auto-interval" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="1">A cada 1 dia</option><option value="2">A cada 2 dias</option><option value="3">A cada 3 dias</option><option value="7">Semanal</option><option value="14">Quinzenal</option><option value="30">Mensal</option></select></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <div class="form-group" style="flex:2"><label>Palavra-chave de Busca</label><input type="text" id="auto-keyword" placeholder="Ex: informatica, medicamentos..."></div>
+            <div class="form-group" style="flex:0.5"><label>Estado (UF)</label><input type="text" id="auto-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase"></div>
+            <div class="form-group" style="flex:0.5"><label>Qtd. Licitacoes</label><input type="number" id="auto-qty" value="20" min="3" max="200"></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <div class="form-group"><label>Filtro CNAE (opcional)</label><input type="text" id="auto-cnae" placeholder="Ex: informatica, alimentacao..."></div>
+            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="search">Busca PNCP</option><option value="fornecedores">Fornecedores existentes</option><option value="both">Ambos</option></select></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <div class="form-group"><label>Conta Gmail</label><select id="auto-gmail" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
+            <div class="form-group"><label>Template</label><select id="auto-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
+          </div>
+          <div class="form-row" style="margin-top:12px">
+            <div class="form-group"><label>Categoria Alvo</label><select id="auto-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="all">Todos</option><option value="empresa">Empresas</option><option value="contabilidade">Contabilidades</option><option value="provavel_contabilidade">Prov. Contabilidade</option></select></div>
+            <div class="form-group" style="flex:0.5"><label>Max Emails/Execucao</label><input type="number" id="auto-max" value="50" min="1" max="450"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-green btn-sm" onclick="saveAutoJob()">Salvar</button>
+            <button class="btn btn-green btn-sm" onclick="saveAutoJob(true)">Salvar e Iniciar</button>
+            <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="hideAutoJobForm()">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="auto-jobs-list"></div>
+      </div>
+
+      <div id="auto-logs-section" style="display:none;margin-top:20px">
+        <div class="search-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h2 id="auto-logs-title">Historico de Execucoes</h2>
+            <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="document.getElementById('auto-logs-section').style.display='none'">Fechar</button>
+          </div>
+          <div id="auto-logs-list"></div>
+        </div>
+      </div>
+    </div>
+
+    </main>
+  </div>
+
+  <!-- Modal de Teste de Email -->
+  <div class="modal-overlay" id="test-email-modal" onclick="if(event.target===this)closeTestModal()">
+    <div class="modal-content" style="max-width:600px">
+      <button class="modal-close" onclick="closeTestModal()">&times;</button>
+      <div class="modal-title">Testar Envio de Email</div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Template</label>
+        <select id="test-template" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px" onchange="previewTestEmail()"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Email de Teste</label>
+        <input type="email" id="test-email-input" placeholder="seu@email.com" style="width:100%">
+      </div>
+      <div id="test-preview" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-green btn-sm" onclick="sendTestEmail()">Enviar Teste</button>
+        <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="closeTestModal()">Cancelar</button>
+      </div>
+      <div id="test-result" style="margin-top:12px"></div>
+    </div>
   </div>
 
   <!-- Modal de Detalhes da Licitacao -->
@@ -523,6 +641,7 @@ function addLead(data) {
     telefones: data.telefones || null,
     municipio: data.municipio || null,
     uf: data.uf || null,
+    cnaePrincipal: data.cnaePrincipal || null,
     origem: data.origem || 'manual',
     valorHomologado: data.valorHomologado || null,
     categoria: data.categoria || autoCategoria(data.emailCategory, data.email),
@@ -602,22 +721,26 @@ function renderLeads() {
 
   actionsEl.style.display = leads.length > 0 ? 'flex' : 'none';
 
-  const filtered = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  let filtered = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  const cnaeFilter = (document.getElementById('leads-cnae-filter')?.value || '').toLowerCase().trim();
+  if (cnaeFilter) filtered = filtered.filter(l => (l.cnaePrincipal || '').toLowerCase().includes(cnaeFilter));
 
   if (filtered.length === 0) {
-    resultsEl.innerHTML = '<div class="results"><div class="empty">' + (leads.length === 0 ? 'Nenhum lead adicionado ainda. Use o botao "+" nas abas de Busca de Emails, Fornecedores ou Contratos.' : 'Nenhum lead nesta categoria.') + '</div></div>';
+    resultsEl.innerHTML = '<div class="results"><div class="empty">' + (leads.length === 0 ? 'Nenhum lead adicionado ainda. Use o botao "+" nas abas de Busca de Emails, Fornecedores ou Contratos.' : 'Nenhum lead nesta categoria' + (cnaeFilter ? ' com este CNAE' : '') + '.') + '</div></div>';
     return;
   }
 
   let html = '<div class="results"><div class="results-header"><h3>' + (leadFilter === 'todos' ? 'Todos os Leads' : catLabel(leadFilter)) + ' (' + filtered.length + ')</h3></div><div class="table-wrap"><table><thead><tr>' +
-    '<th>Empresa</th><th>Email</th><th>Categoria</th><th>Cidade/UF</th><th>Origem</th><th>Valor</th><th></th>' +
+    '<th>Empresa</th><th>Email</th><th>Categoria</th><th>Atividade (CNAE)</th><th>Cidade/UF</th><th>Origem</th><th>Valor</th><th></th>' +
     '</tr></thead><tbody>';
 
   filtered.forEach(l => {
+    const cnaeShort = (l.cnaePrincipal || '-').length > 40 ? (l.cnaePrincipal || '').substring(0,37) + '...' : (l.cnaePrincipal || '-');
     html += '<tr>' +
       '<td><div style="font-weight:600;font-size:12px">' + (l.razaoSocial || 'Sem nome') + '</div><div style="color:#475569;font-size:11px">' + l.cnpj + '</div></td>' +
       '<td>' + (l.email ? '<a class="email-link" href="mailto:' + l.email + '">' + l.email + '</a>' : '<span class="badge badge-red">Sem email</span>') + '</td>' +
       '<td><button class="badge-cat badge ' + catBadge(l.categoria) + '" onclick="toggleCategoria(\\''+l.cnpj+'\\');event.stopPropagation()" title="Clique para alterar">' + catLabel(l.categoria) + '</button></td>' +
+      '<td style="font-size:11px;color:#94a3b8;max-width:180px" title="' + (l.cnaePrincipal||'').replace(/"/g,'') + '">' + cnaeShort + '</td>' +
       '<td style="font-size:12px">' + (l.municipio || '') + (l.uf ? '/' + l.uf : '') + '</td>' +
       '<td><span class="badge badge-blue">' + (l.origem || '-') + '</span></td>' +
       '<td style="font-size:12px;color:#22c55e;font-weight:600">' + money(l.valorHomologado) + '</td>' +
@@ -639,9 +762,9 @@ function copyLeadEmails() {
 function exportLeadsCSV() {
   const source = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
   if (source.length === 0) return showToast('Nenhum lead para exportar', true);
-  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Origem,Categoria,Valor Homologado';
+  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Origem,Categoria,Valor Homologado';
   const rows = source.map(l => {
-    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', l.origem||'', l.categoria||'', l.valorHomologado||''].join(',');
+    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.origem||'', l.categoria||'', l.valorHomologado||''].join(',');
   });
   const csv = header + '\\n' + rows.join('\\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -663,7 +786,8 @@ function addAllLeads(dataArray, origem) {
     leads.push({
       cnpj, razaoSocial: f.razaoSocial||null, nomeFantasia: f.nomeFantasia||null,
       email: f.email||null, telefones: f.telefones||null, municipio: f.municipio||null,
-      uf: f.uf||null, origem: origem, valorHomologado: f.valorHomologado||null,
+      uf: f.uf||null, cnaePrincipal: f.cnaePrincipal||null, origem: origem,
+      valorHomologado: f.valorHomologado||null,
       categoria: autoCategoria(f.emailCategory, f.email),
       adicionadoEm: new Date().toISOString()
     });
@@ -707,21 +831,30 @@ function setStep(n) {
 }
 
 function switchTab(tabName) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.remove('active','active-green','active-purple','active-amber');
+  });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
-  if (tab) tab.classList.add('active');
+  const nav = document.querySelector('.nav-item[data-tab="' + tabName + '"]');
+  if (nav) nav.classList.add(nav.dataset.activeClass || 'active');
   const panel = document.getElementById('panel-' + tabName);
   if (panel) panel.classList.add('active');
+  // Close mobile sidebar
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('show');
+  // Lazy-load hooks
+  if (tabName === 'leads') renderLeads();
+  if (tabName === 'licitacoes' && !licLoaded) { licLoaded = true; licPage = 1; searchLicitacoes(); }
+  if (tabName === 'gmail' && !gmailLoaded) { gmailLoaded = true; loadGmailStatus(); }
+  if (tabName === 'automacao' && !autoLoaded) { autoLoaded = true; loadAutomacao(); }
 }
 
-// Tabs
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    switchTab(tab.dataset.tab);
-    if (tab.dataset.tab === 'leads') renderLeads();
-  });
-});
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+}
 
 // Store last busca-emails data for "add all"
 let lastBuscaData = [];
@@ -807,15 +940,16 @@ async function buscaEmails() {
     }
 
     let html = '<div class="results"><div class="results-header"><h3>Detalhes dos Fornecedores</h3></div><div class="table-wrap"><table><thead><tr>' +
-      '<th>Empresa</th><th>Email</th><th>Telefone</th><th>Cidade/UF</th><th>Valor</th><th>Fonte</th><th></th>' +
+      '<th>Empresa</th><th>Email</th><th>Atividade</th><th>Cidade/UF</th><th>Valor</th><th>Fonte</th><th></th>' +
       '</tr></thead><tbody>';
 
     data.data.forEach((f, i) => {
       const isInLeads = leads.some(l => l.cnpj === (f.cnpj||'').replace(/\\D/g,''));
+      const cnaeTag = f.cnaePrincipal ? '<span class="badge badge-gray" style="font-size:10px" title="' + (f.cnaePrincipal||'').replace(/"/g,'') + '">' + (f.cnaePrincipal||'').substring(0,25) + '</span>' : '-';
       html += '<tr>' +
         '<td><div style="font-weight:600;font-size:12px">' + (f.razaoSocial||'Sem nome') + '</div><div style="color:#475569;font-size:11px">' + f.cnpj + '</div></td>' +
         '<td>' + (f.email ? '<a class="email-link" href="mailto:' + f.email + '">' + f.email + '</a>' : '<span class="badge badge-red">Nao encontrado</span>') + '</td>' +
-        '<td style="font-size:12px">' + (f.telefones||'-') + '</td>' +
+        '<td>' + cnaeTag + '</td>' +
         '<td style="font-size:12px">' + (f.municipio||'') + (f.uf ? '/' + f.uf : '') + '</td>' +
         '<td style="font-size:12px;font-weight:600;color:#22c55e">' + money(f.valorHomologado) + '</td>' +
         '<td><span class="badge ' + (f.emailSource === 'not_found' || f.emailSource === 'lookup_failed' ? 'badge-gray' : 'badge-blue') + '">' + f.emailSource + '</span>' +
@@ -1022,6 +1156,7 @@ async function searchFornecedores() {
           '<div class="item"><label>Telefone</label><span>' + (f.telefones||'-') + '</span></div>' +
           '<div class="item"><label>Cidade/UF</label><span>' + (f.municipio||'') + (f.uf ? '/' + f.uf : '') + '</span></div>' +
           '<div class="item"><label>Porte</label><span>' + (f.porte||'-') + '</span></div>' +
+          '<div class="item"><label>Atividade (CNAE)</label><span style="font-size:12px">' + (f.cnaePrincipal||'-') + '</span></div>' +
           '<div class="item"><label>Valor Homologado</label><span style="color:#22c55e;font-weight:600">' + money(f.valorHomologado) + '</span></div>' +
           '<div class="item"><label>Fonte do Email</label><span><span class="badge badge-blue">' + f.emailSource + '</span>' +
             (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange">CONTAB</span>' : f.emailCategory === 'provavel_contabilidade' ? ' <span class="badge badge-yellow">PROV. CONTAB</span>' : '') + '</span></div>' +
@@ -1370,30 +1505,293 @@ async function sendGmailEmails() {
 // Update preview when filter changes
 document.getElementById('gmail-send-filter')?.addEventListener('change', updateSendPreview);
 
+// ============ AUTOMACAO ============
+let autoLoaded = false;
+let autoJobs = [];
+
+async function loadAutomacao() {
+  try {
+    const [statusData, jobsData] = await Promise.all([
+      apiFetch('/api/automation/status'),
+      apiFetch('/api/automation/jobs')
+    ]);
+    autoJobs = jobsData;
+    const st = document.getElementById('auto-status');
+    st.innerHTML =
+      '<div class="stat"><div class="stat-value" style="color:#f59e0b">' + statusData.activeJobs + '</div><div class="stat-label">Jobs ativos</div></div>' +
+      '<div class="stat"><div class="stat-value blue">' + statusData.totalJobs + '</div><div class="stat-label">Total de jobs</div></div>' +
+      '<div class="stat"><div class="stat-value green">' + statusData.emailsToday + '</div><div class="stat-label">Emails hoje</div></div>' +
+      '<div class="stat"><div class="stat-value">' + (statusData.nextRun ? timeSince(statusData.nextRun) : 'N/A') + '</div><div class="stat-label">Proxima execucao</div></div>';
+    renderAutoJobs();
+    // Load gmail accounts and templates for form selects
+    if (!gmailLoaded) { gmailLoaded = true; await loadGmailStatus(); }
+    updateAutoFormSelects();
+  } catch(e) { showToast('Erro ao carregar automacao: ' + e.message, true); }
+}
+
+function updateAutoFormSelects() {
+  const gmailSel = document.getElementById('auto-gmail');
+  if (gmailAccount) {
+    gmailSel.innerHTML = '<option value="' + gmailAccount.id + '">' + gmailAccount.email + '</option>';
+  } else {
+    gmailSel.innerHTML = '<option value="">Nenhuma conta conectada</option>';
+  }
+  const tplSel = document.getElementById('auto-template');
+  tplSel.innerHTML = '<option value="">Selecione...</option>' +
+    gmailTemplates.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+}
+
+function renderAutoJobs() {
+  const el = document.getElementById('auto-jobs-list');
+  if (autoJobs.length === 0) {
+    el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px">Nenhum job criado ainda.</div>';
+    return;
+  }
+  let html = '';
+  autoJobs.forEach(j => {
+    const stats = j.lastRunStats ? JSON.parse(j.lastRunStats) : null;
+    const statusBadge = j.isActive ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Pausado</span>';
+    const lastBadge = j.lastRunStatus ? ('<span class="badge ' + (j.lastRunStatus === 'completed' ? 'badge-green' : j.lastRunStatus === 'failed' ? 'badge-red' : 'badge-yellow') + '">' + j.lastRunStatus + '</span>') : '<span class="badge badge-gray">Nunca executado</span>';
+    html += '<div class="card" style="margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px">' +
+        '<div><strong style="color:#f8fafc;font-size:15px">' + j.name + '</strong> ' + statusBadge +
+        '<div style="color:#64748b;font-size:12px;margin-top:4px">Busca: "' + (j.searchKeyword || '*') + '"' + (j.searchUf ? ' | ' + j.searchUf : '') + ' | ' + j.searchQuantity + ' licit. | A cada ' + j.intervalDays + ' dia(s) | Max ' + j.maxEmailsPerRun + ' emails</div>' +
+        (j.searchCnae ? '<div style="color:#94a3b8;font-size:11px">CNAE: ' + j.searchCnae + '</div>' : '') +
+        '<div style="color:#64748b;font-size:11px;margin-top:2px">Ultima exec: ' + lastBadge + (j.lastRunAt ? ' em ' + new Date(j.lastRunAt).toLocaleString('pt-BR') : '') +
+        (stats ? ' | Encontrados: ' + (stats.emailsFound||0) + ' | Enviados: ' + (stats.emailsSent||0) + ' | Falhas: ' + (stats.emailsFailed||0) : '') + '</div>' +
+        (j.nextRunAt && j.isActive ? '<div style="color:#f59e0b;font-size:11px">Proxima: ' + new Date(j.nextRunAt).toLocaleString('pt-BR') + '</div>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          (j.isActive ? '<button class="btn btn-xs" style="background:#334155;color:#94a3b8" onclick="pauseAutoJob(' + j.id + ')">Pausar</button>' : '<button class="btn btn-xs btn-green" onclick="startAutoJob(' + j.id + ')">Iniciar</button>') +
+          '<button class="btn btn-xs" style="background:#f59e0b;color:#000" onclick="runAutoJobNow(' + j.id + ')">Executar Agora</button>' +
+          '<button class="btn btn-xs btn-primary" onclick="editAutoJob(' + j.id + ')">Editar</button>' +
+          '<button class="btn btn-xs" style="background:#334155;color:#94a3b8" onclick="showAutoLogs(' + j.id + ',\\'' + j.name.replace(/'/g,'') + '\\')">Historico</button>' +
+          '<button class="btn btn-xs btn-red" onclick="deleteAutoJob(' + j.id + ')">Excluir</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function showAutoJobForm(id) {
+  document.getElementById('auto-job-form').style.display = 'block';
+  document.getElementById('auto-edit-id').value = id || '';
+  if (id) {
+    const j = autoJobs.find(x => x.id === id);
+    if (j) {
+      document.getElementById('auto-name').value = j.name;
+      document.getElementById('auto-interval').value = j.intervalDays;
+      document.getElementById('auto-keyword').value = j.searchKeyword || '';
+      document.getElementById('auto-uf').value = j.searchUf || '';
+      document.getElementById('auto-qty').value = j.searchQuantity;
+      document.getElementById('auto-cnae').value = j.searchCnae || '';
+      document.getElementById('auto-source').value = j.sourceType || 'search';
+      document.getElementById('auto-gmail').value = j.gmailAccountId || '';
+      document.getElementById('auto-template').value = j.templateId || '';
+      document.getElementById('auto-category').value = j.targetCategory || 'all';
+      document.getElementById('auto-max').value = j.maxEmailsPerRun;
+    }
+  } else {
+    document.getElementById('auto-name').value = '';
+    document.getElementById('auto-keyword').value = '';
+    document.getElementById('auto-uf').value = '';
+    document.getElementById('auto-qty').value = '20';
+    document.getElementById('auto-cnae').value = '';
+    document.getElementById('auto-source').value = 'search';
+    document.getElementById('auto-category').value = 'all';
+    document.getElementById('auto-max').value = '50';
+  }
+  updateAutoFormSelects();
+}
+
+function hideAutoJobForm() {
+  document.getElementById('auto-job-form').style.display = 'none';
+}
+
+function editAutoJob(id) { showAutoJobForm(id); }
+
+async function saveAutoJob(startAfter) {
+  const id = document.getElementById('auto-edit-id').value;
+  const name = document.getElementById('auto-name').value.trim();
+  if (!name) return showToast('Informe um nome para o job', true);
+  const templateId = document.getElementById('auto-template').value;
+  const gmailAccountId = document.getElementById('auto-gmail').value;
+  if (!templateId) return showToast('Selecione um template', true);
+  if (!gmailAccountId) return showToast('Selecione uma conta Gmail', true);
+
+  const body = {
+    name,
+    searchKeyword: document.getElementById('auto-keyword').value,
+    searchUf: document.getElementById('auto-uf').value.toUpperCase() || null,
+    searchQuantity: Number(document.getElementById('auto-qty').value) || 20,
+    searchCnae: document.getElementById('auto-cnae').value || null,
+    sourceType: document.getElementById('auto-source').value,
+    templateId: Number(templateId),
+    gmailAccountId: Number(gmailAccountId),
+    targetCategory: document.getElementById('auto-category').value || 'all',
+    intervalDays: Number(document.getElementById('auto-interval').value),
+    maxEmailsPerRun: Number(document.getElementById('auto-max').value) || 50
+  };
+
+  try {
+    if (id) {
+      await apiPut('/api/automation/jobs/' + id, body);
+      showToast('Job atualizado!');
+    } else {
+      const res = await apiPost('/api/automation/jobs', body);
+      if (startAfter && res.id) {
+        await apiPost('/api/automation/jobs/' + res.id + '/start', {});
+        showToast('Job criado e iniciado!');
+      } else {
+        showToast('Job criado!');
+      }
+    }
+    hideAutoJobForm();
+    await loadAutomacao();
+  } catch(e) { showToast(e.message, true); }
+}
+
+async function startAutoJob(id) {
+  try {
+    await apiPost('/api/automation/jobs/' + id + '/start', {});
+    showToast('Job iniciado!');
+    await loadAutomacao();
+  } catch(e) { showToast(e.message, true); }
+}
+
+async function pauseAutoJob(id) {
+  try {
+    await apiPost('/api/automation/jobs/' + id + '/pause', {});
+    showToast('Job pausado');
+    await loadAutomacao();
+  } catch(e) { showToast(e.message, true); }
+}
+
+async function runAutoJobNow(id) {
+  if (!confirm('Executar este job agora?')) return;
+  try {
+    await apiPost('/api/automation/jobs/' + id + '/run-now', {});
+    showToast('Execucao iniciada! Verifique o historico em alguns instantes.');
+    setTimeout(() => loadAutomacao(), 3000);
+  } catch(e) { showToast(e.message, true); }
+}
+
+async function deleteAutoJob(id) {
+  if (!confirm('Excluir este job permanentemente?')) return;
+  try {
+    await apiDelete('/api/automation/jobs/' + id);
+    showToast('Job excluido');
+    await loadAutomacao();
+  } catch(e) { showToast(e.message, true); }
+}
+
+async function showAutoLogs(jobId, jobName) {
+  const section = document.getElementById('auto-logs-section');
+  const title = document.getElementById('auto-logs-title');
+  const list = document.getElementById('auto-logs-list');
+  section.style.display = 'block';
+  title.textContent = 'Historico: ' + jobName;
+  list.innerHTML = '<div class="loading show"><div class="spinner"></div><div class="loading-text">Carregando historico...</div></div>';
+
+  try {
+    const logs = await apiFetch('/api/automation/jobs/' + jobId + '/logs');
+    if (!logs.length) {
+      list.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px">Nenhuma execucao registrada.</div>';
+      return;
+    }
+    let html = '<div class="table-wrap"><table><thead><tr><th>Data</th><th>Status</th><th>Encontrados</th><th>Enviados</th><th>Falhas</th><th>Ignorados</th><th>Duracao</th></tr></thead><tbody>';
+    logs.forEach(l => {
+      const dur = l.completedAt && l.startedAt ? Math.round((new Date(l.completedAt) - new Date(l.startedAt)) / 1000) + 's' : '-';
+      html += '<tr>' +
+        '<td style="font-size:12px;white-space:nowrap">' + new Date(l.startedAt).toLocaleString('pt-BR') + '</td>' +
+        '<td><span class="badge ' + (l.status === 'completed' ? 'badge-green' : l.status === 'failed' ? 'badge-red' : 'badge-yellow') + '">' + l.status + '</span>' +
+        (l.errorMessage ? '<div style="color:#fca5a5;font-size:11px;margin-top:2px">' + l.errorMessage.substring(0,100) + '</div>' : '') + '</td>' +
+        '<td style="text-align:center">' + l.emailsFound + '</td>' +
+        '<td style="text-align:center;color:#22c55e;font-weight:600">' + l.emailsSent + '</td>' +
+        '<td style="text-align:center;color:#ef4444">' + l.emailsFailed + '</td>' +
+        '<td style="text-align:center;color:#64748b">' + l.emailsSkipped + '</td>' +
+        '<td style="font-size:12px">' + dur + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    list.innerHTML = html;
+  } catch(e) { list.innerHTML = '<div class="empty">Erro: ' + e.message + '</div>'; }
+}
+
+function timeSince(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = d - now;
+  if (diff < 0) return 'agora';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h > 0) return h + 'h ' + m + 'min';
+  return m + 'min';
+}
+
+// ============ TESTE DE EMAIL ============
+function showTestEmailModal() {
+  const modal = document.getElementById('test-email-modal');
+  modal.classList.add('show');
+  const sel = document.getElementById('test-template');
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    gmailTemplates.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+  document.getElementById('test-email-input').value = '';
+  document.getElementById('test-preview').innerHTML = '';
+  document.getElementById('test-result').innerHTML = '';
+}
+
+function closeTestModal() {
+  document.getElementById('test-email-modal').classList.remove('show');
+}
+
+async function previewTestEmail() {
+  const templateId = document.getElementById('test-template').value;
+  if (!templateId) { document.getElementById('test-preview').innerHTML = ''; return; }
+  try {
+    const data = await apiPost('/api/gmail/preview-template', { templateId: Number(templateId) });
+    document.getElementById('test-preview').innerHTML =
+      '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-top:8px">' +
+      '<div style="font-size:11px;color:#475569;margin-bottom:4px">ASSUNTO:</div>' +
+      '<div style="font-size:13px;color:#f8fafc;margin-bottom:8px">' + data.subject + '</div>' +
+      '<div style="font-size:11px;color:#475569;margin-bottom:4px">CORPO:</div>' +
+      '<div style="font-size:12px;color:#e2e8f0;white-space:pre-wrap;line-height:1.5">' + data.body + '</div></div>';
+  } catch(e) { document.getElementById('test-preview').innerHTML = '<div style="color:#fca5a5;font-size:12px">Erro: ' + e.message + '</div>'; }
+}
+
+async function sendTestEmail() {
+  const templateId = document.getElementById('test-template').value;
+  const testEmail = document.getElementById('test-email-input').value.trim();
+  if (!templateId) return showToast('Selecione um template', true);
+  if (!testEmail) return showToast('Informe um email de teste', true);
+  if (!gmailAccount) return showToast('Conecte uma conta Gmail primeiro', true);
+
+  const resEl = document.getElementById('test-result');
+  resEl.innerHTML = '<div class="loading show" style="padding:8px"><div class="spinner"></div><div class="loading-text">Enviando...</div></div>';
+
+  try {
+    const data = await apiPost('/api/gmail/send-test', {
+      accountId: gmailAccount.id,
+      templateId: Number(templateId),
+      testEmail: testEmail
+    });
+    resEl.innerHTML = '<div class="info-box success" style="margin:0"><strong>Enviado!</strong> Email de teste enviado para ' + testEmail + '</div>';
+  } catch(e) {
+    resEl.innerHTML = '<div class="info-box" style="margin:0;border-left-color:#ef4444"><strong>Erro:</strong> ' + e.message + '</div>';
+  }
+}
+
 // ============ INIT ============
+let licLoaded = false;
+
 // Enter key support
 document.getElementById('be-q').addEventListener('keydown', e => { if(e.key==='Enter') buscaEmails(); });
 document.getElementById('lic-q').addEventListener('keydown', e => { if(e.key==='Enter'){licPage=1;searchLicitacoes();} });
 document.getElementById('cnpj-input').addEventListener('keydown', e => { if(e.key==='Enter') lookupCnpj(); });
 
-// Escape to close modal
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeLicModal(); });
-
-// Auto-load tabs when clicked
-let licLoaded = false;
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (tab.dataset.tab === 'licitacoes' && !licLoaded) {
-      licLoaded = true;
-      licPage = 1;
-      searchLicitacoes();
-    }
-    if (tab.dataset.tab === 'gmail' && !gmailLoaded) {
-      gmailLoaded = true;
-      loadGmailStatus();
-    }
-  });
-});
+// Escape to close modals
+document.addEventListener('keydown', e => { if(e.key==='Escape') { closeLicModal(); closeTestModal(); } });
 
 // Load leads from localStorage on startup
 loadLeads();

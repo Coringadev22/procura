@@ -1,0 +1,254 @@
+import type { FastifyInstance } from "fastify";
+import { eq, desc } from "drizzle-orm";
+import { db } from "../config/database.js";
+import { automationJobs, automationRunLog } from "../db/schema.js";
+import {
+  scheduleJob,
+  cancelJob,
+  executeJob,
+  getSchedulerStatus,
+} from "../services/automation.service.js";
+
+export async function automationRoutes(app: FastifyInstance) {
+  // Get scheduler status
+  app.get("/api/automation/status", async () => {
+    return getSchedulerStatus();
+  });
+
+  // List all jobs
+  app.get("/api/automation/jobs", async () => {
+    return db
+      .select()
+      .from(automationJobs)
+      .orderBy(desc(automationJobs.createdAt))
+      .all();
+  });
+
+  // Get single job with recent logs
+  app.get<{ Params: { id: string } }>(
+    "/api/automation/jobs/:id",
+    async (request) => {
+      const id = Number(request.params.id);
+      const job = db
+        .select()
+        .from(automationJobs)
+        .where(eq(automationJobs.id, id))
+        .get();
+      if (!job) return { error: "Job nao encontrado" };
+
+      const logs = db
+        .select()
+        .from(automationRunLog)
+        .where(eq(automationRunLog.jobId, id))
+        .orderBy(desc(automationRunLog.startedAt))
+        .limit(10)
+        .all();
+
+      return { job, logs };
+    }
+  );
+
+  // Create job
+  app.post<{
+    Body: {
+      name: string;
+      searchKeyword?: string;
+      searchUf?: string;
+      searchQuantity?: number;
+      searchCnae?: string;
+      templateId?: number;
+      gmailAccountId?: number;
+      targetCategory?: string;
+      sourceType?: string;
+      intervalDays: number;
+      maxEmailsPerRun?: number;
+    };
+  }>("/api/automation/jobs", async (request) => {
+    const body = request.body;
+    const result = db
+      .insert(automationJobs)
+      .values({
+        name: body.name,
+        searchKeyword: body.searchKeyword || "",
+        searchUf: body.searchUf || null,
+        searchQuantity: body.searchQuantity || 20,
+        searchCnae: body.searchCnae || null,
+        templateId: body.templateId || null,
+        gmailAccountId: body.gmailAccountId || null,
+        targetCategory: body.targetCategory || "all",
+        sourceType: body.sourceType || "search",
+        intervalDays: body.intervalDays,
+        maxEmailsPerRun: body.maxEmailsPerRun || 50,
+      })
+      .run();
+
+    return { id: Number(result.lastInsertRowid), success: true };
+  });
+
+  // Update job
+  app.put<{
+    Params: { id: string };
+    Body: {
+      name?: string;
+      searchKeyword?: string;
+      searchUf?: string;
+      searchQuantity?: number;
+      searchCnae?: string;
+      templateId?: number;
+      gmailAccountId?: number;
+      targetCategory?: string;
+      sourceType?: string;
+      intervalDays?: number;
+      maxEmailsPerRun?: number;
+    };
+  }>("/api/automation/jobs/:id", async (request) => {
+    const id = Number(request.params.id);
+    const body = request.body;
+    const updates: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.searchKeyword !== undefined)
+      updates.searchKeyword = body.searchKeyword;
+    if (body.searchUf !== undefined)
+      updates.searchUf = body.searchUf || null;
+    if (body.searchQuantity !== undefined)
+      updates.searchQuantity = body.searchQuantity;
+    if (body.searchCnae !== undefined)
+      updates.searchCnae = body.searchCnae || null;
+    if (body.templateId !== undefined)
+      updates.templateId = body.templateId || null;
+    if (body.gmailAccountId !== undefined)
+      updates.gmailAccountId = body.gmailAccountId || null;
+    if (body.targetCategory !== undefined)
+      updates.targetCategory = body.targetCategory;
+    if (body.sourceType !== undefined) updates.sourceType = body.sourceType;
+    if (body.intervalDays !== undefined)
+      updates.intervalDays = body.intervalDays;
+    if (body.maxEmailsPerRun !== undefined)
+      updates.maxEmailsPerRun = body.maxEmailsPerRun;
+
+    db.update(automationJobs)
+      .set(updates)
+      .where(eq(automationJobs.id, id))
+      .run();
+
+    return { success: true };
+  });
+
+  // Delete job
+  app.delete<{ Params: { id: string } }>(
+    "/api/automation/jobs/:id",
+    async (request) => {
+      const id = Number(request.params.id);
+      cancelJob(id);
+
+      // Delete run logs first
+      db.delete(automationRunLog)
+        .where(eq(automationRunLog.jobId, id))
+        .run();
+
+      db.delete(automationJobs)
+        .where(eq(automationJobs.id, id))
+        .run();
+
+      return { success: true };
+    }
+  );
+
+  // Start job
+  app.post<{ Params: { id: string } }>(
+    "/api/automation/jobs/:id/start",
+    async (request) => {
+      const id = Number(request.params.id);
+      const now = new Date().toISOString();
+      const job = db
+        .select()
+        .from(automationJobs)
+        .where(eq(automationJobs.id, id))
+        .get();
+
+      if (!job) return { error: "Job nao encontrado" };
+
+      const nextRun = new Date(
+        Date.now() + job.intervalDays * 86_400_000
+      );
+
+      db.update(automationJobs)
+        .set({
+          isActive: true,
+          nextRunAt: nextRun.toISOString(),
+          updatedAt: now,
+        })
+        .where(eq(automationJobs.id, id))
+        .run();
+
+      scheduleJob(id);
+      return { success: true, nextRunAt: nextRun.toISOString() };
+    }
+  );
+
+  // Pause job
+  app.post<{ Params: { id: string } }>(
+    "/api/automation/jobs/:id/pause",
+    async (request) => {
+      const id = Number(request.params.id);
+      cancelJob(id);
+
+      db.update(automationJobs)
+        .set({
+          isActive: false,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(automationJobs.id, id))
+        .run();
+
+      return { success: true };
+    }
+  );
+
+  // Run now
+  app.post<{ Params: { id: string } }>(
+    "/api/automation/jobs/:id/run-now",
+    async (request) => {
+      const id = Number(request.params.id);
+      const job = db
+        .select()
+        .from(automationJobs)
+        .where(eq(automationJobs.id, id))
+        .get();
+
+      if (!job) return { error: "Job nao encontrado" };
+
+      // Execute in background, return immediately
+      executeJob(id).catch((err) => {
+        // Error handling is done inside executeJob
+      });
+
+      return { success: true, message: "Execucao iniciada" };
+    }
+  );
+
+  // Get job logs
+  app.get<{
+    Params: { id: string };
+    Querystring: { pagina?: string; tamanhoPagina?: string };
+  }>("/api/automation/jobs/:id/logs", async (request) => {
+    const id = Number(request.params.id);
+    const page = Number(request.query.pagina ?? 1);
+    const pageSize = Number(request.query.tamanhoPagina ?? 20);
+    const offset = (page - 1) * pageSize;
+
+    const logs = db
+      .select()
+      .from(automationRunLog)
+      .where(eq(automationRunLog.jobId, id))
+      .orderBy(desc(automationRunLog.startedAt))
+      .limit(pageSize)
+      .offset(offset)
+      .all();
+
+    return { data: logs, page, pageSize };
+  });
+}
