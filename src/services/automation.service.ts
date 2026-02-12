@@ -12,33 +12,30 @@ import { logger } from "../utils/logger.js";
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
 
-export function startAutomationScheduler(): void {
-  const jobs = db
+export async function startAutomationScheduler(): Promise<void> {
+  const jobs = await db
     .select()
     .from(automationJobs)
-    .where(eq(automationJobs.isActive, true))
-    .all();
+    .where(eq(automationJobs.isActive, true));
 
   // Mark orphaned running runs as failed (server restart recovery)
-  const runningRuns = db
+  const runningRuns = await db
     .select()
     .from(automationRunLog)
-    .where(eq(automationRunLog.status, "running"))
-    .all();
+    .where(eq(automationRunLog.status, "running"));
 
   for (const run of runningRuns) {
-    db.update(automationRunLog)
+    await db.update(automationRunLog)
       .set({
         status: "failed",
         completedAt: new Date().toISOString(),
         errorMessage: "Servidor reiniciado durante execucao",
       })
-      .where(eq(automationRunLog.id, run.id))
-      .run();
+      .where(eq(automationRunLog.id, run.id));
   }
 
   for (const job of jobs) {
-    scheduleJob(job.id);
+    await scheduleJob(job.id);
   }
 
   logger.info(
@@ -46,14 +43,13 @@ export function startAutomationScheduler(): void {
   );
 }
 
-export function scheduleJob(jobId: number): void {
+export async function scheduleJob(jobId: number): Promise<void> {
   cancelJob(jobId);
 
-  const job = db
+  const [job] = await db
     .select()
     .from(automationJobs)
-    .where(eq(automationJobs.id, jobId))
-    .get();
+    .where(eq(automationJobs.id, jobId));
 
   if (!job || !job.isActive) return;
 
@@ -67,10 +63,9 @@ export function scheduleJob(jobId: number): void {
     const nextRun = new Date(
       Date.now() + job.intervalDays * 86_400_000
     );
-    db.update(automationJobs)
+    await db.update(automationJobs)
       .set({ nextRunAt: nextRun.toISOString() })
-      .where(eq(automationJobs.id, jobId))
-      .run();
+      .where(eq(automationJobs.id, jobId));
     delayMs = job.intervalDays * 86_400_000;
   }
 
@@ -102,8 +97,8 @@ export function cancelAllJobs(): void {
   activeTimers.clear();
 }
 
-export function getSchedulerStatus() {
-  const allJobs = db.select().from(automationJobs).all();
+export async function getSchedulerStatus() {
+  const allJobs = await db.select().from(automationJobs);
   const activeCount = allJobs.filter((j) => j.isActive).length;
 
   // Find next scheduled run
@@ -118,12 +113,12 @@ export function getSchedulerStatus() {
 
   // Today's sent email count
   const today = new Date().toISOString().split("T")[0];
-  const todaySent = db
+  const allSent = await db
     .select()
     .from(emailSendLog)
-    .where(eq(emailSendLog.status, "sent"))
-    .all()
-    .filter((l) => l.sentAt?.startsWith(today)).length;
+    .where(eq(emailSendLog.status, "sent"));
+
+  const todaySent = allSent.filter((l) => l.sentAt?.startsWith(today)).length;
 
   return {
     activeJobs: activeCount,
@@ -135,22 +130,21 @@ export function getSchedulerStatus() {
 }
 
 export async function executeJob(jobId: number): Promise<void> {
-  const job = db
+  const [job] = await db
     .select()
     .from(automationJobs)
-    .where(eq(automationJobs.id, jobId))
-    .get();
+    .where(eq(automationJobs.id, jobId));
 
   if (!job || !job.isActive) return;
 
   logger.info(`Executando automacao "${job.name}" (id=${jobId})...`);
 
   // Create run log
-  const runResult = db
+  const [runLog] = await db
     .insert(automationRunLog)
     .values({ jobId, status: "running" })
-    .run();
-  const runLogId = Number(runResult.lastInsertRowid);
+    .returning({ id: automationRunLog.id });
+  const runLogId = runLog.id;
 
   let emailsFound = 0;
   let emailsSent = 0;
@@ -204,11 +198,10 @@ export async function executeJob(jobId: number): Promise<void> {
 
     // Source: existing fornecedores
     if (job.sourceType === "fornecedores" || job.sourceType === "both") {
-      const dbFornecedores = db
+      const dbFornecedores = await db
         .select()
         .from(fornecedores)
-        .where(isNotNull(fornecedores.email))
-        .all();
+        .where(isNotNull(fornecedores.email));
 
       for (const f of dbFornecedores) {
         if (f.email && !recipientMap.has(f.email.toLowerCase())) {
@@ -249,7 +242,7 @@ export async function executeJob(jobId: number): Promise<void> {
 
     // 4. Deduplicate against already-sent emails for this template
     if (job.templateId) {
-      const sentEmails = db
+      const sentEmails = await db
         .select({ email: emailSendLog.recipientEmail })
         .from(emailSendLog)
         .where(
@@ -257,8 +250,7 @@ export async function executeJob(jobId: number): Promise<void> {
             eq(emailSendLog.templateId, job.templateId),
             eq(emailSendLog.status, "sent")
           )
-        )
-        .all();
+        );
 
       const sentSet = new Set(
         sentEmails.map((r) => r.email.toLowerCase())
@@ -312,7 +304,7 @@ export async function executeJob(jobId: number): Promise<void> {
 
     // 7. Update run log
     const now = new Date().toISOString();
-    db.update(automationRunLog)
+    await db.update(automationRunLog)
       .set({
         completedAt: now,
         status: emailsFailed > 0 && emailsSent === 0 ? "failed" : "completed",
@@ -321,8 +313,7 @@ export async function executeJob(jobId: number): Promise<void> {
         emailsFailed,
         emailsSkipped,
       })
-      .where(eq(automationRunLog.id, runLogId))
-      .run();
+      .where(eq(automationRunLog.id, runLogId));
 
     // 8. Update job
     const nextRun = new Date(
@@ -335,7 +326,7 @@ export async function executeJob(jobId: number): Promise<void> {
       emailsSkipped,
     });
 
-    db.update(automationJobs)
+    await db.update(automationJobs)
       .set({
         lastRunAt: now,
         nextRunAt: nextRun.toISOString(),
@@ -344,8 +335,7 @@ export async function executeJob(jobId: number): Promise<void> {
         lastRunStats: stats,
         updatedAt: now,
       })
-      .where(eq(automationJobs.id, jobId))
-      .run();
+      .where(eq(automationJobs.id, jobId));
 
     logger.info(
       `Automacao "${job.name}" concluida: ${emailsSent} enviados, ${emailsFailed} falharam, ${emailsSkipped} ignorados`
@@ -353,7 +343,7 @@ export async function executeJob(jobId: number): Promise<void> {
   } catch (err: any) {
     logger.error(`Automation job error (id=${jobId}): ${err.message}`);
 
-    db.update(automationRunLog)
+    await db.update(automationRunLog)
       .set({
         completedAt: new Date().toISOString(),
         status: "failed",
@@ -363,14 +353,13 @@ export async function executeJob(jobId: number): Promise<void> {
         emailsSkipped,
         errorMessage: err.message,
       })
-      .where(eq(automationRunLog.id, runLogId))
-      .run();
+      .where(eq(automationRunLog.id, runLogId));
 
     const now = new Date().toISOString();
     const nextRun = new Date(
       Date.now() + job.intervalDays * 86_400_000
     );
-    db.update(automationJobs)
+    await db.update(automationJobs)
       .set({
         lastRunAt: now,
         nextRunAt: nextRun.toISOString(),
@@ -383,10 +372,9 @@ export async function executeJob(jobId: number): Promise<void> {
         }),
         updatedAt: now,
       })
-      .where(eq(automationJobs.id, jobId))
-      .run();
+      .where(eq(automationJobs.id, jobId));
   }
 
   // 9. Reschedule
-  scheduleJob(jobId);
+  await scheduleJob(jobId);
 }

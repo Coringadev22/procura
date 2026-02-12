@@ -12,16 +12,15 @@ import {
 export async function automationRoutes(app: FastifyInstance) {
   // Get scheduler status
   app.get("/api/automation/status", async () => {
-    return getSchedulerStatus();
+    return await getSchedulerStatus();
   });
 
   // List all jobs
   app.get("/api/automation/jobs", async () => {
-    return db
+    return await db
       .select()
       .from(automationJobs)
-      .orderBy(desc(automationJobs.createdAt))
-      .all();
+      .orderBy(desc(automationJobs.createdAt));
   });
 
   // Get single job with recent logs
@@ -29,20 +28,18 @@ export async function automationRoutes(app: FastifyInstance) {
     "/api/automation/jobs/:id",
     async (request) => {
       const id = Number(request.params.id);
-      const job = db
+      const [job] = await db
         .select()
         .from(automationJobs)
-        .where(eq(automationJobs.id, id))
-        .get();
+        .where(eq(automationJobs.id, id));
       if (!job) return { error: "Job nao encontrado" };
 
-      const logs = db
+      const logs = await db
         .select()
         .from(automationRunLog)
         .where(eq(automationRunLog.jobId, id))
         .orderBy(desc(automationRunLog.startedAt))
-        .limit(10)
-        .all();
+        .limit(10);
 
       return { job, logs };
     }
@@ -65,7 +62,7 @@ export async function automationRoutes(app: FastifyInstance) {
     };
   }>("/api/automation/jobs", async (request) => {
     const body = request.body;
-    const result = db
+    const [result] = await db
       .insert(automationJobs)
       .values({
         name: body.name,
@@ -80,9 +77,9 @@ export async function automationRoutes(app: FastifyInstance) {
         intervalDays: body.intervalDays,
         maxEmailsPerRun: body.maxEmailsPerRun || 50,
       })
-      .run();
+      .returning({ id: automationJobs.id });
 
-    return { id: Number(result.lastInsertRowid), success: true };
+    return { id: result.id, success: true };
   });
 
   // Update job
@@ -129,10 +126,9 @@ export async function automationRoutes(app: FastifyInstance) {
     if (body.maxEmailsPerRun !== undefined)
       updates.maxEmailsPerRun = body.maxEmailsPerRun;
 
-    db.update(automationJobs)
+    await db.update(automationJobs)
       .set(updates)
-      .where(eq(automationJobs.id, id))
-      .run();
+      .where(eq(automationJobs.id, id));
 
     return { success: true };
   });
@@ -145,13 +141,11 @@ export async function automationRoutes(app: FastifyInstance) {
       cancelJob(id);
 
       // Delete run logs first
-      db.delete(automationRunLog)
-        .where(eq(automationRunLog.jobId, id))
-        .run();
+      await db.delete(automationRunLog)
+        .where(eq(automationRunLog.jobId, id));
 
-      db.delete(automationJobs)
-        .where(eq(automationJobs.id, id))
-        .run();
+      await db.delete(automationJobs)
+        .where(eq(automationJobs.id, id));
 
       return { success: true };
     }
@@ -163,11 +157,10 @@ export async function automationRoutes(app: FastifyInstance) {
     async (request) => {
       const id = Number(request.params.id);
       const now = new Date().toISOString();
-      const job = db
+      const [job] = await db
         .select()
         .from(automationJobs)
-        .where(eq(automationJobs.id, id))
-        .get();
+        .where(eq(automationJobs.id, id));
 
       if (!job) return { error: "Job nao encontrado" };
 
@@ -175,16 +168,15 @@ export async function automationRoutes(app: FastifyInstance) {
         Date.now() + job.intervalDays * 86_400_000
       );
 
-      db.update(automationJobs)
+      await db.update(automationJobs)
         .set({
           isActive: true,
           nextRunAt: nextRun.toISOString(),
           updatedAt: now,
         })
-        .where(eq(automationJobs.id, id))
-        .run();
+        .where(eq(automationJobs.id, id));
 
-      scheduleJob(id);
+      await scheduleJob(id);
       return { success: true, nextRunAt: nextRun.toISOString() };
     }
   );
@@ -196,13 +188,12 @@ export async function automationRoutes(app: FastifyInstance) {
       const id = Number(request.params.id);
       cancelJob(id);
 
-      db.update(automationJobs)
+      await db.update(automationJobs)
         .set({
           isActive: false,
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(automationJobs.id, id))
-        .run();
+        .where(eq(automationJobs.id, id));
 
       return { success: true };
     }
@@ -213,11 +204,10 @@ export async function automationRoutes(app: FastifyInstance) {
     "/api/automation/jobs/:id/run-now",
     async (request) => {
       const id = Number(request.params.id);
-      const job = db
+      const [job] = await db
         .select()
         .from(automationJobs)
-        .where(eq(automationJobs.id, id))
-        .get();
+        .where(eq(automationJobs.id, id));
 
       if (!job) return { error: "Job nao encontrado" };
 
@@ -240,15 +230,14 @@ export async function automationRoutes(app: FastifyInstance) {
     const pageSize = Number(request.query.tamanhoPagina ?? 20);
     const offset = (page - 1) * pageSize;
 
-    const logs = db
+    const logs = await db
       .select()
       .from(automationRunLog)
       .where(eq(automationRunLog.jobId, id))
       .orderBy(desc(automationRunLog.startedAt))
       .limit(pageSize)
-      .offset(offset)
-      .all();
+      .offset(offset);
 
-    return { data: logs, page, pageSize };
+    return logs;
   });
 }

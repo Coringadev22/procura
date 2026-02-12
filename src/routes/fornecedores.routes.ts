@@ -51,13 +51,12 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const results = db
+    const results = await db
       .select()
       .from(fornecedores)
       .where(where)
       .limit(pageSize)
-      .offset(offset)
-      .all();
+      .offset(offset);
 
     return {
       data: results,

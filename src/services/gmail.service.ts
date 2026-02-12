@@ -40,11 +40,11 @@ export async function handleCallback(code: string): Promise<{ email: string }> {
   const email = userInfo.data.email!;
   const displayName = userInfo.data.name ?? email;
 
-  const existing = db.select().from(gmailAccounts).where(eq(gmailAccounts.email, email)).get();
+  const [existing] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.email, email));
   const now = new Date().toISOString();
 
   if (existing) {
-    db.update(gmailAccounts)
+    await db.update(gmailAccounts)
       .set({
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token ?? existing.refreshToken,
@@ -53,25 +53,23 @@ export async function handleCallback(code: string): Promise<{ email: string }> {
         isActive: true,
         updatedAt: now,
       })
-      .where(eq(gmailAccounts.id, existing.id))
-      .run();
+      .where(eq(gmailAccounts.id, existing.id));
   } else {
-    db.insert(gmailAccounts)
+    await db.insert(gmailAccounts)
       .values({
         email,
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token!,
         tokenExpiry: new Date(tokens.expiry_date!).toISOString(),
         displayName,
-      })
-      .run();
+      });
   }
 
   return { email };
 }
 
 async function getAuthenticatedClient(accountId: number) {
-  const account = db.select().from(gmailAccounts).where(eq(gmailAccounts.id, accountId)).get();
+  const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.id, accountId));
   if (!account) throw new Error("Gmail account not found");
 
   const oauth2 = getOAuth2Client();
@@ -84,41 +82,38 @@ async function getAuthenticatedClient(accountId: number) {
   // Refresh if token expires within 1 minute
   if (new Date(account.tokenExpiry).getTime() <= Date.now() + 60_000) {
     const { credentials } = await oauth2.refreshAccessToken();
-    db.update(gmailAccounts)
+    await db.update(gmailAccounts)
       .set({
         accessToken: credentials.access_token!,
         tokenExpiry: new Date(credentials.expiry_date!).toISOString(),
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(gmailAccounts.id, accountId))
-      .run();
+      .where(eq(gmailAccounts.id, accountId));
     oauth2.setCredentials(credentials);
   }
 
   return { oauth2, account };
 }
 
-function checkAndResetDailyLimit(account: typeof gmailAccounts.$inferSelect): boolean {
+async function checkAndResetDailyLimit(account: typeof gmailAccounts.$inferSelect): Promise<boolean> {
   const today = new Date().toISOString().split("T")[0];
   if (account.dailySentDate !== today) {
-    db.update(gmailAccounts)
+    await db.update(gmailAccounts)
       .set({ dailySentCount: 0, dailySentDate: today })
-      .where(eq(gmailAccounts.id, account.id))
-      .run();
+      .where(eq(gmailAccounts.id, account.id));
     return true;
   }
   return account.dailySentCount < DAILY_LIMIT;
 }
 
-function incrementSentCount(accountId: number) {
-  const account = db.select().from(gmailAccounts).where(eq(gmailAccounts.id, accountId)).get();
+async function incrementSentCount(accountId: number) {
+  const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.id, accountId));
   if (!account) return;
   const today = new Date().toISOString().split("T")[0];
   const count = account.dailySentDate === today ? account.dailySentCount + 1 : 1;
-  db.update(gmailAccounts)
+  await db.update(gmailAccounts)
     .set({ dailySentCount: count, dailySentDate: today, updatedAt: new Date().toISOString() })
-    .where(eq(gmailAccounts.id, accountId))
-    .run();
+    .where(eq(gmailAccounts.id, accountId));
 }
 
 export function renderTemplate(template: string, vars: Record<string, string>): string {
@@ -135,11 +130,11 @@ export async function sendEmail(
   try {
     const { oauth2, account } = await getAuthenticatedClient(accountId);
 
-    if (!checkAndResetDailyLimit(account)) {
+    if (!(await checkAndResetDailyLimit(account))) {
       return { success: false, error: "Limite diario de 450 emails atingido" };
     }
 
-    const template = db.select().from(emailTemplates).where(eq(emailTemplates.id, templateId)).get();
+    const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, templateId));
     if (!template) return { success: false, error: "Template nao encontrado" };
 
     const subject = renderTemplate(template.subject, templateVars);
@@ -167,8 +162,8 @@ export async function sendEmail(
       requestBody: { raw: rawMessage },
     });
 
-    incrementSentCount(accountId);
-    db.insert(emailSendLog).values({
+    await incrementSentCount(accountId);
+    await db.insert(emailSendLog).values({
       gmailAccountId: accountId,
       templateId,
       recipientEmail,
@@ -176,13 +171,13 @@ export async function sendEmail(
       recipientName: templateVars.empresa ?? null,
       subject,
       status: "sent",
-    }).run();
+    });
 
     return { success: true };
   } catch (err: any) {
     logger.error(`Gmail send error: ${err.message}`);
 
-    db.insert(emailSendLog).values({
+    await db.insert(emailSendLog).values({
       gmailAccountId: accountId,
       templateId,
       recipientEmail,
@@ -191,7 +186,7 @@ export async function sendEmail(
       subject: templateVars._renderedSubject ?? "unknown",
       status: "failed",
       errorMessage: err.message,
-    }).run();
+    });
 
     return { success: false, error: err.message };
   }

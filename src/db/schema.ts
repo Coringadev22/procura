@@ -1,7 +1,7 @@
-import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, real, serial, boolean } from "drizzle-orm/pg-core";
 
-export const licitacoes = sqliteTable("licitacoes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const licitacoes = pgTable("licitacoes", {
+  id: serial("id").primaryKey(),
   numeroControlePNCP: text("numero_controle_pncp").notNull().unique(),
   orgaoCnpj: text("orgao_cnpj").notNull(),
   orgaoNome: text("orgao_nome"),
@@ -15,7 +15,7 @@ export const licitacoes = sqliteTable("licitacoes", {
   valorTotalHomologado: real("valor_total_homologado"),
   dataPublicacao: text("data_publicacao"),
   situacao: text("situacao"),
-  temResultado: integer("tem_resultado", { mode: "boolean" }),
+  temResultado: boolean("tem_resultado"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -24,8 +24,8 @@ export const licitacoes = sqliteTable("licitacoes", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const fornecedores = sqliteTable("fornecedores", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const fornecedores = pgTable("fornecedores", {
+  id: serial("id").primaryKey(),
   cnpj: text("cnpj").notNull().unique(),
   razaoSocial: text("razao_social"),
   nomeFantasia: text("nome_fantasia"),
@@ -49,8 +49,8 @@ export const fornecedores = sqliteTable("fornecedores", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const licitacaoFornecedores = sqliteTable("licitacao_fornecedores", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const licitacaoFornecedores = pgTable("licitacao_fornecedores", {
+  id: serial("id").primaryKey(),
   licitacaoId: integer("licitacao_id")
     .notNull()
     .references(() => licitacoes.id),
@@ -66,8 +66,8 @@ export const licitacaoFornecedores = sqliteTable("licitacao_fornecedores", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const contratos = sqliteTable("contratos", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const contratos = pgTable("contratos", {
+  id: serial("id").primaryKey(),
   numeroControlePNCP: text("numero_controle_pncp").notNull().unique(),
   orgaoCnpj: text("orgao_cnpj").notNull(),
   orgaoNome: text("orgao_nome"),
@@ -87,14 +87,14 @@ export const contratos = sqliteTable("contratos", {
 });
 
 // Gmail OAuth accounts
-export const gmailAccounts = sqliteTable("gmail_accounts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const gmailAccounts = pgTable("gmail_accounts", {
+  id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token").notNull(),
   tokenExpiry: text("token_expiry").notNull(),
   displayName: text("display_name"),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
   dailySentCount: integer("daily_sent_count").notNull().default(0),
   dailySentDate: text("daily_sent_date"),
   createdAt: text("created_at")
@@ -106,13 +106,13 @@ export const gmailAccounts = sqliteTable("gmail_accounts", {
 });
 
 // Email templates
-export const emailTemplates = sqliteTable("email_templates", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   subject: text("subject").notNull(),
   body: text("body").notNull(),
   targetCategory: text("target_category"),
-  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  isDefault: boolean("is_default").notNull().default(false),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -122,8 +122,8 @@ export const emailTemplates = sqliteTable("email_templates", {
 });
 
 // Email send log
-export const emailSendLog = sqliteTable("email_send_log", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const emailSendLog = pgTable("email_send_log", {
+  id: serial("id").primaryKey(),
   gmailAccountId: integer("gmail_account_id")
     .notNull()
     .references(() => gmailAccounts.id),
@@ -140,10 +140,10 @@ export const emailSendLog = sqliteTable("email_send_log", {
 });
 
 // Automation jobs
-export const automationJobs = sqliteTable("automation_jobs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const automationJobs = pgTable("automation_jobs", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
+  isActive: boolean("is_active").notNull().default(false),
 
   // Search parameters
   searchKeyword: text("search_keyword").notNull().default(""),
@@ -176,8 +176,8 @@ export const automationJobs = sqliteTable("automation_jobs", {
 });
 
 // Automation run log
-export const automationRunLog = sqliteTable("automation_run_log", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const automationRunLog = pgTable("automation_run_log", {
+  id: serial("id").primaryKey(),
   jobId: integer("job_id")
     .notNull()
     .references(() => automationJobs.id),

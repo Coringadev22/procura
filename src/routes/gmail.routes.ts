@@ -14,7 +14,7 @@ export async function gmailRoutes(app: FastifyInstance) {
   app.get("/api/gmail/status", async () => {
     const configured = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
     const accounts = configured
-      ? db
+      ? await db
           .select({
             id: gmailAccounts.id,
             email: gmailAccounts.email,
@@ -23,7 +23,6 @@ export async function gmailRoutes(app: FastifyInstance) {
             dailySentCount: gmailAccounts.dailySentCount,
           })
           .from(gmailAccounts)
-          .all()
       : [];
     return { configured, accounts };
   });
@@ -68,10 +67,9 @@ export async function gmailRoutes(app: FastifyInstance) {
     "/api/gmail/accounts/:id",
     async (request) => {
       const id = Number(request.params.id);
-      db.update(gmailAccounts)
+      await db.update(gmailAccounts)
         .set({ isActive: false, updatedAt: new Date().toISOString() })
-        .where(eq(gmailAccounts.id, id))
-        .run();
+        .where(eq(gmailAccounts.id, id));
       return { success: true };
     }
   );
@@ -80,7 +78,7 @@ export async function gmailRoutes(app: FastifyInstance) {
 
   // List templates
   app.get("/api/gmail/templates", async () => {
-    return db.select().from(emailTemplates).all();
+    return await db.select().from(emailTemplates);
   });
 
   // Create template
@@ -93,7 +91,7 @@ export async function gmailRoutes(app: FastifyInstance) {
     };
   }>("/api/gmail/templates", async (request) => {
     const { name, subject, body, targetCategory } = request.body;
-    const result = db
+    const [result] = await db
       .insert(emailTemplates)
       .values({
         name,
@@ -101,8 +99,8 @@ export async function gmailRoutes(app: FastifyInstance) {
         body,
         targetCategory: targetCategory || null,
       })
-      .run();
-    return { id: Number(result.lastInsertRowid), success: true };
+      .returning({ id: emailTemplates.id });
+    return { id: result.id, success: true };
   });
 
   // Update template
@@ -123,10 +121,9 @@ export async function gmailRoutes(app: FastifyInstance) {
     if (body !== undefined) updates.body = body;
     if (targetCategory !== undefined) updates.targetCategory = targetCategory || null;
 
-    db.update(emailTemplates)
+    await db.update(emailTemplates)
       .set(updates)
-      .where(eq(emailTemplates.id, id))
-      .run();
+      .where(eq(emailTemplates.id, id));
     return { success: true };
   });
 
@@ -135,7 +132,7 @@ export async function gmailRoutes(app: FastifyInstance) {
     "/api/gmail/templates/:id",
     async (request) => {
       const id = Number(request.params.id);
-      db.delete(emailTemplates).where(eq(emailTemplates.id, id)).run();
+      await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
       return { success: true };
     }
   );
@@ -209,13 +206,12 @@ export async function gmailRoutes(app: FastifyInstance) {
     const pageSize = Number(request.query.tamanhoPagina ?? 50);
     const offset = (page - 1) * pageSize;
 
-    const logs = db
+    const logs = await db
       .select()
       .from(emailSendLog)
       .orderBy(desc(emailSendLog.sentAt))
       .limit(pageSize)
-      .offset(offset)
-      .all();
+      .offset(offset);
 
     return { data: logs, page, pageSize };
   });
@@ -259,11 +255,10 @@ export async function gmailRoutes(app: FastifyInstance) {
   }>("/api/gmail/preview-template", async (request) => {
     const { templateId } = request.body;
 
-    const template = db
+    const [template] = await db
       .select()
       .from(emailTemplates)
-      .where(eq(emailTemplates.id, templateId))
-      .get();
+      .where(eq(emailTemplates.id, templateId));
     if (!template) return { error: "Template nao encontrado" };
 
     const vars: Record<string, string> = {

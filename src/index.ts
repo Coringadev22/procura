@@ -47,7 +47,7 @@ app.setErrorHandler((error, request, reply) => {
 try {
   await app.listen({ port: env.PORT, host: env.HOST });
 
-  startAutomationScheduler();
+  await startAutomationScheduler();
 
   logger.info(`Servidor rodando em http://localhost:${env.PORT}`);
   logger.info(`Dashboard visual: http://localhost:${env.PORT}/`);

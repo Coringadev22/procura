@@ -10,7 +10,7 @@ const HTML = `<!DOCTYPE html>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
 
-    .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .app-layout { min-height: 100vh; }
     .sidebar { background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-right: 1px solid #334155; display: flex; flex-direction: column; position: fixed; left: 0; top: 0; bottom: 0; width: 260px; z-index: 100; overflow-y: auto; }
     .sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid #334155; }
     .sidebar-logo h1 { font-size: 22px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px; }
@@ -144,7 +144,7 @@ const HTML = `<!DOCTYPE html>
     .actions-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
     @media (max-width: 768px) {
-      .app-layout { grid-template-columns: 1fr; }
+      .app-layout { }
       .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
       .sidebar.open { transform: translateX(0); }
       .sidebar-overlay.show { display: block; }

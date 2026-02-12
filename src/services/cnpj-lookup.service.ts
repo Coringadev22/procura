@@ -138,10 +138,10 @@ async function fetchReceitaWsEmail(cnpj: string): Promise<string | null> {
   }
 }
 
-function upsertCache(cnpj: string, result: CnpjData, cached: typeof fornecedores.$inferSelect | undefined) {
+async function upsertCache(cnpj: string, result: CnpjData, cached: typeof fornecedores.$inferSelect | undefined) {
   const now = new Date().toISOString();
   if (cached) {
-    db.update(fornecedores)
+    await db.update(fornecedores)
       .set({
         razaoSocial: result.razaoSocial,
         nomeFantasia: result.nomeFantasia,
@@ -158,10 +158,9 @@ function upsertCache(cnpj: string, result: CnpjData, cached: typeof fornecedores
         lastLookupAt: now,
         updatedAt: now,
       })
-      .where(eq(fornecedores.cnpj, cnpj))
-      .run();
+      .where(eq(fornecedores.cnpj, cnpj));
   } else {
-    db.insert(fornecedores)
+    await db.insert(fornecedores)
       .values({
         cnpj,
         razaoSocial: result.razaoSocial,
@@ -177,8 +176,7 @@ function upsertCache(cnpj: string, result: CnpjData, cached: typeof fornecedores
         emailSource: result.emailSource,
         emailCategory: result.emailCategory,
         lastLookupAt: now,
-      })
-      .run();
+      });
   }
 }
 
@@ -186,11 +184,10 @@ export async function lookupCnpj(rawCnpj: string, skipSlowFallback = false): Pro
   const cnpj = cleanCnpj(rawCnpj);
 
   // 1. Check cache
-  const cached = db
+  const [cached] = await db
     .select()
     .from(fornecedores)
-    .where(eq(fornecedores.cnpj, cnpj))
-    .get();
+    .where(eq(fornecedores.cnpj, cnpj));
 
   if (cached && isCacheValid(cached.lastLookupAt)) {
     return {
@@ -268,7 +265,7 @@ export async function lookupCnpj(rawCnpj: string, skipSlowFallback = false): Pro
   // 6. Classify email category using 3-layer detection
   result.emailCategory = detectEmailCategory(result.email, result.emailSource, primaryEmail);
 
-  upsertCache(cnpj, result, cached);
+  await upsertCache(cnpj, result, cached);
   return result;
 }
 
@@ -289,11 +286,10 @@ export async function lookupMultipleCnpjs(
   // Step 1: Check cache for all CNPJs
   const needsLookup: string[] = [];
   for (const cnpj of unique) {
-    const cached = db
+    const [cached] = await db
       .select()
       .from(fornecedores)
-      .where(eq(fornecedores.cnpj, cnpj))
-      .get();
+      .where(eq(fornecedores.cnpj, cnpj));
 
     if (cached && isCacheValid(cached.lastLookupAt)) {
       results.set(cnpj, {
@@ -344,11 +340,10 @@ export async function lookupMultipleCnpjs(
   );
 
   if (skipSlowFallback) {
-    const now = new Date().toISOString();
     for (const [cnpj, data] of brasilData) {
-      const cached = db.select().from(fornecedores).where(eq(fornecedores.cnpj, cnpj)).get();
+      const [cached] = await db.select().from(fornecedores).where(eq(fornecedores.cnpj, cnpj));
       if (cached) {
-        db.update(fornecedores)
+        await db.update(fornecedores)
           .set({
             razaoSocial: data.razaoSocial,
             nomeFantasia: data.nomeFantasia,
@@ -359,12 +354,11 @@ export async function lookupMultipleCnpjs(
             cep: data.cep,
             cnaePrincipal: data.cnaePrincipal,
             situacaoCadastral: data.situacaoCadastral,
-            updatedAt: now,
+            updatedAt: new Date().toISOString(),
           })
-          .where(eq(fornecedores.cnpj, cnpj))
-          .run();
+          .where(eq(fornecedores.cnpj, cnpj));
       } else {
-        db.insert(fornecedores)
+        await db.insert(fornecedores)
           .values({
             cnpj,
             razaoSocial: data.razaoSocial,
@@ -378,8 +372,7 @@ export async function lookupMultipleCnpjs(
             situacaoCadastral: data.situacaoCadastral,
             emailSource: "not_found",
             emailCategory: "empresa",
-          })
-          .run();
+          });
       }
       results.set(cnpj, data);
     }
@@ -438,8 +431,8 @@ export async function lookupMultipleCnpjs(
     // Classify using 3-layer detection
     data.emailCategory = detectEmailCategory(data.email, data.emailSource);
 
-    const cached = db.select().from(fornecedores).where(eq(fornecedores.cnpj, cnpj)).get();
-    upsertCache(cnpj, data, cached);
+    const [cached] = await db.select().from(fornecedores).where(eq(fornecedores.cnpj, cnpj));
+    await upsertCache(cnpj, data, cached);
     results.set(cnpj, data);
   }
 

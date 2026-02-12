@@ -41,42 +41,38 @@ export async function enrichLicitacao(
 
   // 5. Ensure licitacao record exists for linking
   const controlePncp = `${orgaoCnpj}-1-${String(sequencialCompra).padStart(6, "0")}/${anoCompra}`;
-  let licitacao = db
+  let [licitacao] = await db
     .select()
     .from(licitacoes)
-    .where(eq(licitacoes.numeroControlePNCP, controlePncp))
-    .get();
+    .where(eq(licitacoes.numeroControlePNCP, controlePncp));
 
   if (!licitacao) {
-    db.insert(licitacoes)
+    await db.insert(licitacoes)
       .values({
         numeroControlePNCP: controlePncp,
         orgaoCnpj,
         anoCompra,
         sequencialCompra,
         temResultado: true,
-      })
-      .run();
+      });
 
-    licitacao = db
+    [licitacao] = await db
       .select()
       .from(licitacoes)
-      .where(eq(licitacoes.numeroControlePNCP, controlePncp))
-      .get();
+      .where(eq(licitacoes.numeroControlePNCP, controlePncp));
   }
 
   // 6. Link fornecedores to licitacao
   if (licitacao) {
     for (const r of pjResultados) {
       const cnpj = cleanCnpj(r.niFornecedor);
-      const fornecedor = db
+      const [fornecedor] = await db
         .select()
         .from(fornecedores)
-        .where(eq(fornecedores.cnpj, cnpj))
-        .get();
+        .where(eq(fornecedores.cnpj, cnpj));
 
       if (fornecedor) {
-        const existing = db
+        const [existing] = await db
           .select()
           .from(licitacaoFornecedores)
           .where(
@@ -85,11 +81,10 @@ export async function enrichLicitacao(
               eq(licitacaoFornecedores.fornecedorId, fornecedor.id),
               eq(licitacaoFornecedores.numeroItem, r.numeroItem)
             )
-          )
-          .get();
+          );
 
         if (!existing) {
-          db.insert(licitacaoFornecedores)
+          await db.insert(licitacaoFornecedores)
             .values({
               licitacaoId: licitacao.id,
               fornecedorId: fornecedor.id,
@@ -97,8 +92,7 @@ export async function enrichLicitacao(
               itemDescricao: r.itemDescricao,
               numeroItem: r.numeroItem,
               dataResultado: r.dataResultado,
-            })
-            .run();
+            });
         }
       }
     }
