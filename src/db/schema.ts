@@ -143,6 +143,7 @@ export const emailSendLog = pgTable("email_send_log", {
 export const automationJobs = pgTable("automation_jobs", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  jobType: text("job_type").notNull().default("email_send"),
   isActive: boolean("is_active").notNull().default(false),
 
   // Search parameters
@@ -160,7 +161,7 @@ export const automationJobs = pgTable("automation_jobs", {
   sourceType: text("source_type").notNull().default("search"),
 
   // Schedule
-  intervalDays: integer("interval_days").notNull().default(1),
+  intervalHours: integer("interval_hours").notNull().default(24),
   maxEmailsPerRun: integer("max_emails_per_run").notNull().default(50),
   lastRunAt: text("last_run_at"),
   nextRunAt: text("next_run_at"),

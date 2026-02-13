@@ -264,6 +264,7 @@ const HTML = `<!DOCTYPE html>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <button class="btn btn-green btn-sm" onclick="copyLeadEmails()">Copiar Emails</button>
         <button class="btn btn-primary btn-sm" onclick="exportLeadsCSV()">Exportar CSV</button>
+        <button class="btn btn-sm" style="background:#8b5cf6;color:#fff" onclick="reclassifyLeads()">Reclassificar</button>
         <button class="btn btn-red btn-sm" onclick="clearLeads()">Limpar Tudo</button>
       </div>
       <div id="leads-results"></div>
@@ -497,7 +498,8 @@ const HTML = `<!DOCTYPE html>
           <input type="hidden" id="auto-edit-id" value="">
           <div class="form-row">
             <div class="form-group" style="flex:2"><label>Nome do Job</label><input type="text" id="auto-name" placeholder="Ex: Busca diaria informatica SP"></div>
-            <div class="form-group" style="flex:0.8"><label>Intervalo</label><select id="auto-interval" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="1">A cada 1 dia</option><option value="2">A cada 2 dias</option><option value="3">A cada 3 dias</option><option value="7">Semanal</option><option value="14">Quinzenal</option><option value="30">Mensal</option></select></div>
+            <div class="form-group" style="flex:0.8"><label>Tipo</label><select id="auto-job-type" onchange="toggleAutoJobType()" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="populate_leads">Popular Leads</option><option value="email_send">Enviar Emails</option></select></div>
+            <div class="form-group" style="flex:0.8"><label>Intervalo</label><select id="auto-interval" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="6">A cada 6h</option><option value="12">A cada 12h</option><option value="24">A cada 24h</option><option value="48">A cada 2 dias</option><option value="72">A cada 3 dias</option><option value="168">Semanal</option></select></div>
           </div>
           <div class="form-row" style="margin-top:12px">
             <div class="form-group" style="flex:2"><label>Palavra-chave de Busca</label><input type="text" id="auto-keyword" placeholder="Ex: informatica, medicamentos..."></div>
@@ -508,13 +510,13 @@ const HTML = `<!DOCTYPE html>
             <div class="form-group"><label>Filtro CNAE (opcional)</label><input type="text" id="auto-cnae" placeholder="Ex: informatica, alimentacao..."></div>
             <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="search">Busca PNCP</option><option value="fornecedores">Fornecedores existentes</option><option value="both">Ambos</option></select></div>
           </div>
-          <div class="form-row" style="margin-top:12px">
+          <div id="auto-email-fields" class="form-row" style="margin-top:12px;display:none">
             <div class="form-group"><label>Conta Gmail</label><select id="auto-gmail" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
             <div class="form-group"><label>Template</label><select id="auto-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
           </div>
           <div class="form-row" style="margin-top:12px">
             <div class="form-group"><label>Categoria Alvo</label><select id="auto-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="all">Todos</option><option value="empresa">Empresas</option><option value="contabilidade">Contabilidades</option><option value="provavel_contabilidade">Prov. Contabilidade</option></select></div>
-            <div class="form-group" style="flex:0.5"><label>Max Emails/Execucao</label><input type="number" id="auto-max" value="50" min="1" max="450"></div>
+            <div class="form-group" style="flex:0.5"><label>Max Leads/Execucao</label><input type="number" id="auto-max" value="50" min="1" max="450"></div>
           </div>
           <div style="margin-top:12px;display:flex;gap:8px">
             <button class="btn btn-green btn-sm" onclick="saveAutoJob()">Salvar</button>
@@ -652,6 +654,20 @@ async function clearLeads() {
   await loadLeads();
   renderLeads();
   showToast('Todos os leads foram removidos');
+}
+
+async function reclassifyLeads() {
+  if (!confirm('Reclassificar todos os leads? Isso vai analisar email, CNAE e razao social para corrigir categorias.')) return;
+  try {
+    const res = await apiPost('/api/leads/reclassify', {});
+    await loadLeads();
+    renderLeads();
+    if (res.reclassified > 0) {
+      showToast(res.reclassified + ' de ' + res.total + ' leads reclassificados!');
+    } else {
+      showToast('Nenhum lead precisou ser reclassificado (' + res.total + ' analisados)');
+    }
+  } catch(e) { showToast('Erro ao reclassificar: ' + e.message, true); }
 }
 
 function catBadge(cat) {
@@ -1541,14 +1557,22 @@ function renderAutoJobs() {
   autoJobs.forEach(j => {
     const stats = j.lastRunStats ? JSON.parse(j.lastRunStats) : null;
     const statusBadge = j.isActive ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Pausado</span>';
-    const lastBadge = j.lastRunStatus ? ('<span class="badge ' + (j.lastRunStatus === 'completed' ? 'badge-green' : j.lastRunStatus === 'failed' ? 'badge-red' : 'badge-yellow') + '">' + j.lastRunStatus + '</span>') : '<span class="badge badge-gray">Nunca executado</span>';
+    const isPopulate = j.jobType === 'populate_leads';
+    const typeBadge = isPopulate ? '<span class="badge badge-blue">Popular Leads</span>' : '<span class="badge badge-yellow">Enviar Emails</span>';
+    const lastBadge = j.lastRunStatus ? ('<span class="badge ' + (j.lastRunStatus === 'completed' || j.lastRunStatus === 'success' ? 'badge-green' : j.lastRunStatus === 'failed' ? 'badge-red' : 'badge-yellow') + '">' + j.lastRunStatus + '</span>') : '<span class="badge badge-gray">Nunca executado</span>';
+    const hours = j.intervalHours || (j.intervalDays ? j.intervalDays * 24 : 24);
+    const intervalLabel = hours < 24 ? 'A cada ' + hours + 'h' : hours === 24 ? 'Diario' : 'A cada ' + (hours / 24) + ' dia(s)';
+    const statsLabel = isPopulate && stats
+      ? ' | Encontrados: ' + (stats.emailsFound||0) + ' | Adicionados: ' + (stats.leadsAdded||stats.emailsSent||0) + ' | Ignorados: ' + (stats.leadsSkipped||stats.emailsSkipped||0)
+      : stats
+        ? ' | Encontrados: ' + (stats.emailsFound||0) + ' | Enviados: ' + (stats.emailsSent||0) + ' | Falhas: ' + (stats.emailsFailed||0)
+        : '';
     html += '<div class="card" style="margin-bottom:8px">' +
       '<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px">' +
-        '<div><strong style="color:#f8fafc;font-size:15px">' + j.name + '</strong> ' + statusBadge +
-        '<div style="color:#64748b;font-size:12px;margin-top:4px">Busca: "' + (j.searchKeyword || '*') + '"' + (j.searchUf ? ' | ' + j.searchUf : '') + ' | ' + j.searchQuantity + ' licit. | A cada ' + j.intervalDays + ' dia(s) | Max ' + j.maxEmailsPerRun + ' emails</div>' +
+        '<div><strong style="color:#f8fafc;font-size:15px">' + j.name + '</strong> ' + statusBadge + ' ' + typeBadge +
+        '<div style="color:#64748b;font-size:12px;margin-top:4px">Busca: "' + (j.searchKeyword || '*') + '"' + (j.searchUf ? ' | ' + j.searchUf : '') + ' | ' + j.searchQuantity + ' licit. | ' + intervalLabel + ' | Max ' + j.maxEmailsPerRun + (isPopulate ? ' leads' : ' emails') + '</div>' +
         (j.searchCnae ? '<div style="color:#94a3b8;font-size:11px">CNAE: ' + j.searchCnae + '</div>' : '') +
-        '<div style="color:#64748b;font-size:11px;margin-top:2px">Ultima exec: ' + lastBadge + (j.lastRunAt ? ' em ' + new Date(j.lastRunAt).toLocaleString('pt-BR') : '') +
-        (stats ? ' | Encontrados: ' + (stats.emailsFound||0) + ' | Enviados: ' + (stats.emailsSent||0) + ' | Falhas: ' + (stats.emailsFailed||0) : '') + '</div>' +
+        '<div style="color:#64748b;font-size:11px;margin-top:2px">Ultima exec: ' + lastBadge + (j.lastRunAt ? ' em ' + new Date(j.lastRunAt).toLocaleString('pt-BR') : '') + statsLabel + '</div>' +
         (j.nextRunAt && j.isActive ? '<div style="color:#f59e0b;font-size:11px">Proxima: ' + new Date(j.nextRunAt).toLocaleString('pt-BR') + '</div>' : '') +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
@@ -1564,6 +1588,12 @@ function renderAutoJobs() {
   el.innerHTML = html;
 }
 
+function toggleAutoJobType() {
+  const jobType = document.getElementById('auto-job-type').value;
+  const emailFields = document.getElementById('auto-email-fields');
+  emailFields.style.display = jobType === 'email_send' ? 'flex' : 'none';
+}
+
 function showAutoJobForm(id) {
   document.getElementById('auto-job-form').style.display = 'block';
   document.getElementById('auto-edit-id').value = id || '';
@@ -1571,7 +1601,8 @@ function showAutoJobForm(id) {
     const j = autoJobs.find(x => x.id === id);
     if (j) {
       document.getElementById('auto-name').value = j.name;
-      document.getElementById('auto-interval').value = j.intervalDays;
+      document.getElementById('auto-job-type').value = j.jobType || 'populate_leads';
+      document.getElementById('auto-interval').value = j.intervalHours || (j.intervalDays ? j.intervalDays * 24 : 24);
       document.getElementById('auto-keyword').value = j.searchKeyword || '';
       document.getElementById('auto-uf').value = j.searchUf || '';
       document.getElementById('auto-qty').value = j.searchQuantity;
@@ -1584,6 +1615,7 @@ function showAutoJobForm(id) {
     }
   } else {
     document.getElementById('auto-name').value = '';
+    document.getElementById('auto-job-type').value = 'populate_leads';
     document.getElementById('auto-keyword').value = '';
     document.getElementById('auto-uf').value = '';
     document.getElementById('auto-qty').value = '20';
@@ -1593,6 +1625,7 @@ function showAutoJobForm(id) {
     document.getElementById('auto-max').value = '50';
   }
   updateAutoFormSelects();
+  toggleAutoJobType();
 }
 
 function hideAutoJobForm() {
@@ -1605,22 +1638,26 @@ async function saveAutoJob(startAfter) {
   const id = document.getElementById('auto-edit-id').value;
   const name = document.getElementById('auto-name').value.trim();
   if (!name) return showToast('Informe um nome para o job', true);
+  const jobType = document.getElementById('auto-job-type').value;
   const templateId = document.getElementById('auto-template').value;
   const gmailAccountId = document.getElementById('auto-gmail').value;
-  if (!templateId) return showToast('Selecione um template', true);
-  if (!gmailAccountId) return showToast('Selecione uma conta Gmail', true);
+  if (jobType === 'email_send') {
+    if (!templateId) return showToast('Selecione um template', true);
+    if (!gmailAccountId) return showToast('Selecione uma conta Gmail', true);
+  }
 
   const body = {
     name,
+    jobType,
     searchKeyword: document.getElementById('auto-keyword').value,
     searchUf: document.getElementById('auto-uf').value.toUpperCase() || null,
     searchQuantity: Number(document.getElementById('auto-qty').value) || 20,
     searchCnae: document.getElementById('auto-cnae').value || null,
     sourceType: document.getElementById('auto-source').value,
-    templateId: Number(templateId),
-    gmailAccountId: Number(gmailAccountId),
+    templateId: templateId ? Number(templateId) : null,
+    gmailAccountId: gmailAccountId ? Number(gmailAccountId) : null,
     targetCategory: document.getElementById('auto-category').value || 'all',
-    intervalDays: Number(document.getElementById('auto-interval').value),
+    intervalHours: Number(document.getElementById('auto-interval').value),
     maxEmailsPerRun: Number(document.getElementById('auto-max').value) || 50
   };
 

@@ -5,9 +5,11 @@ import {
   automationRunLog,
   emailSendLog,
   fornecedores,
+  leads,
 } from "../db/schema.js";
 import { sendEmail } from "./gmail.service.js";
 import { runEmailSearch } from "./email-search.service.js";
+import { classifyLead } from "../utils/email-category.js";
 import { logger } from "../utils/logger.js";
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
@@ -43,6 +45,10 @@ export async function startAutomationScheduler(): Promise<void> {
   );
 }
 
+function getIntervalMs(job: { intervalHours: number }): number {
+  return job.intervalHours * 3_600_000;
+}
+
 export async function scheduleJob(jobId: number): Promise<void> {
   cancelJob(jobId);
 
@@ -59,14 +65,11 @@ export async function scheduleJob(jobId: number): Promise<void> {
     delayMs = new Date(job.nextRunAt).getTime() - Date.now();
     if (delayMs < 0) delayMs = 1000; // missed run, execute soon
   } else {
-    // First run: schedule for intervalDays from now
-    const nextRun = new Date(
-      Date.now() + job.intervalDays * 86_400_000
-    );
+    const nextRun = new Date(Date.now() + getIntervalMs(job));
     await db.update(automationJobs)
       .set({ nextRunAt: nextRun.toISOString() })
       .where(eq(automationJobs.id, jobId));
-    delayMs = job.intervalDays * 86_400_000;
+    delayMs = getIntervalMs(job);
   }
 
   const timer = setTimeout(async () => {
@@ -101,7 +104,6 @@ export async function getSchedulerStatus() {
   const allJobs = await db.select().from(automationJobs);
   const activeCount = allJobs.filter((j) => j.isActive).length;
 
-  // Find next scheduled run
   let nextRun: string | null = null;
   for (const job of allJobs) {
     if (job.isActive && job.nextRunAt) {
@@ -111,7 +113,6 @@ export async function getSchedulerStatus() {
     }
   }
 
-  // Today's sent email count
   const today = new Date().toISOString().split("T")[0];
   const allSent = await db
     .select()
@@ -137,9 +138,8 @@ export async function executeJob(jobId: number): Promise<void> {
 
   if (!job || !job.isActive) return;
 
-  logger.info(`Executando automacao "${job.name}" (id=${jobId})...`);
+  logger.info(`Executando automacao "${job.name}" (id=${jobId}, tipo=${job.jobType})...`);
 
-  // Create run log
   const [runLog] = await db
     .insert(automationRunLog)
     .values({ jobId, status: "running" })
@@ -152,21 +152,23 @@ export async function executeJob(jobId: number): Promise<void> {
   let emailsSkipped = 0;
 
   try {
-    // 1. Gather recipients
+    // 1. Gather recipients from search and/or fornecedores
     interface Recipient {
       email: string;
       cnpj: string;
       empresa: string;
+      nomeFantasia: string | null;
       cnaePrincipal: string | null;
       emailCategory: string;
+      telefones: string | null;
       municipio: string | null;
       uf: string | null;
       valor: string;
+      valorNum: number | null;
     }
 
     const recipientMap = new Map<string, Recipient>();
 
-    // Source: PNCP search
     if (job.sourceType === "search" || job.sourceType === "both") {
       try {
         const searchResult = await runEmailSearch({
@@ -181,13 +183,16 @@ export async function executeJob(jobId: number): Promise<void> {
               email: f.email,
               cnpj: f.cnpj,
               empresa: f.razaoSocial || f.nomeFantasia || "",
+              nomeFantasia: f.nomeFantasia,
               cnaePrincipal: f.cnaePrincipal,
               emailCategory: f.emailCategory,
+              telefones: f.telefones,
               municipio: f.municipio,
               uf: f.uf,
               valor: f.valorHomologado
                 ? `R$ ${f.valorHomologado.toLocaleString("pt-BR")}`
                 : "",
+              valorNum: f.valorHomologado ?? null,
             });
           }
         }
@@ -196,7 +201,6 @@ export async function executeJob(jobId: number): Promise<void> {
       }
     }
 
-    // Source: existing fornecedores
     if (job.sourceType === "fornecedores" || job.sourceType === "both") {
       const dbFornecedores = await db
         .select()
@@ -209,11 +213,14 @@ export async function executeJob(jobId: number): Promise<void> {
             email: f.email,
             cnpj: f.cnpj,
             empresa: f.razaoSocial || f.nomeFantasia || "",
+            nomeFantasia: f.nomeFantasia,
             cnaePrincipal: f.cnaePrincipal,
             emailCategory: f.emailCategory || "empresa",
+            telefones: f.telefones,
             municipio: f.municipio,
             uf: f.uf,
             valor: "",
+            valorNum: null,
           });
         }
       }
@@ -240,106 +247,164 @@ export async function executeJob(jobId: number): Promise<void> {
 
     emailsFound = recipients.length;
 
-    // 4. Deduplicate against already-sent emails for this template
-    if (job.templateId) {
-      const sentEmails = await db
-        .select({ email: emailSendLog.recipientEmail })
-        .from(emailSendLog)
-        .where(
-          and(
-            eq(emailSendLog.templateId, job.templateId),
-            eq(emailSendLog.status, "sent")
-          )
-        );
+    // ========== POPULATE LEADS ==========
+    if (job.jobType === "populate_leads") {
+      let leadsAdded = 0;
+      let leadsSkipped = 0;
 
-      const sentSet = new Set(
-        sentEmails.map((r) => r.email.toLowerCase())
+      recipients = recipients.slice(0, job.maxEmailsPerRun);
+
+      for (const r of recipients) {
+        const cnpj = r.cnpj.replace(/\D/g, "");
+        if (!cnpj) { leadsSkipped++; continue; }
+
+        // Check if CNPJ already exists in leads
+        const [existing] = await db.select({ id: leads.id }).from(leads).where(eq(leads.cnpj, cnpj));
+        if (existing) { leadsSkipped++; continue; }
+
+        // Check if email already exists in leads
+        if (r.email) {
+          const [byEmail] = await db.select({ id: leads.id }).from(leads).where(eq(leads.email, r.email.toLowerCase()));
+          if (byEmail) { leadsSkipped++; continue; }
+        }
+
+        // Classify using full analysis (email + CNAE + razao social)
+        const categoria = classifyLead(r.email, r.cnaePrincipal, r.empresa);
+
+        await db.insert(leads).values({
+          cnpj,
+          razaoSocial: r.empresa || null,
+          nomeFantasia: r.nomeFantasia || null,
+          email: r.email?.toLowerCase() || null,
+          telefones: r.telefones || null,
+          municipio: r.municipio || null,
+          uf: r.uf || null,
+          cnaePrincipal: r.cnaePrincipal || null,
+          origem: "auto_job_" + jobId,
+          valorHomologado: r.valorNum,
+          categoria,
+        });
+        leadsAdded++;
+      }
+
+      emailsSent = leadsAdded; // reuse field for "leads added"
+      emailsSkipped = leadsSkipped;
+
+      const now = new Date().toISOString();
+      await db.update(automationRunLog)
+        .set({
+          completedAt: now,
+          status: "completed",
+          emailsFound,
+          emailsSent: leadsAdded,
+          emailsFailed: 0,
+          emailsSkipped: leadsSkipped,
+        })
+        .where(eq(automationRunLog.id, runLogId));
+
+      const nextRun = new Date(Date.now() + getIntervalMs(job));
+      await db.update(automationJobs)
+        .set({
+          lastRunAt: now,
+          nextRunAt: nextRun.toISOString(),
+          lastRunStatus: "success",
+          lastRunStats: JSON.stringify({ emailsFound, leadsAdded, leadsSkipped }),
+          updatedAt: now,
+        })
+        .where(eq(automationJobs.id, jobId));
+
+      logger.info(
+        `Automacao "${job.name}" concluida: ${leadsAdded} leads adicionados, ${leadsSkipped} ignorados de ${emailsFound} encontrados`
       );
 
-      const before = recipients.length;
-      recipients = recipients.filter(
-        (r) => !sentSet.has(r.email.toLowerCase())
-      );
-      emailsSkipped = before - recipients.length;
-    }
+    // ========== EMAIL SEND (original flow) ==========
+    } else {
+      // 4. Deduplicate against already-sent emails
+      if (job.templateId) {
+        const sentEmails = await db
+          .select({ email: emailSendLog.recipientEmail })
+          .from(emailSendLog)
+          .where(
+            and(
+              eq(emailSendLog.templateId, job.templateId),
+              eq(emailSendLog.status, "sent")
+            )
+          );
 
-    // 5. Apply max limit
-    recipients = recipients.slice(0, job.maxEmailsPerRun);
-
-    // 6. Send emails
-    if (
-      recipients.length > 0 &&
-      job.gmailAccountId &&
-      job.templateId
-    ) {
-      for (let i = 0; i < recipients.length; i++) {
-        const r = recipients[i];
-        const vars: Record<string, string> = {
-          empresa: r.empresa,
-          cnpj: r.cnpj,
-          email: r.email,
-          contato: r.empresa,
-          valor: r.valor,
-          cidade: r.municipio || "",
-          uf: r.uf || "",
-        };
-
-        const result = await sendEmail(
-          job.gmailAccountId,
-          job.templateId,
-          r.email,
-          r.cnpj,
-          vars
+        const sentSet = new Set(
+          sentEmails.map((r) => r.email.toLowerCase())
         );
 
-        if (result.success) emailsSent++;
-        else emailsFailed++;
+        const before = recipients.length;
+        recipients = recipients.filter(
+          (r) => !sentSet.has(r.email.toLowerCase())
+        );
+        emailsSkipped = before - recipients.length;
+      }
 
-        // 1 second delay between sends
-        if (i < recipients.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+      recipients = recipients.slice(0, job.maxEmailsPerRun);
+
+      // 5. Send emails
+      if (recipients.length > 0 && job.gmailAccountId && job.templateId) {
+        for (let i = 0; i < recipients.length; i++) {
+          const r = recipients[i];
+          const vars: Record<string, string> = {
+            empresa: r.empresa,
+            cnpj: r.cnpj,
+            email: r.email,
+            contato: r.empresa,
+            valor: r.valor,
+            cidade: r.municipio || "",
+            uf: r.uf || "",
+          };
+
+          const result = await sendEmail(
+            job.gmailAccountId,
+            job.templateId,
+            r.email,
+            r.cnpj,
+            vars
+          );
+
+          if (result.success) emailsSent++;
+          else emailsFailed++;
+
+          if (i < recipients.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
         }
       }
+
+      // 6. Update run log
+      const now = new Date().toISOString();
+      await db.update(automationRunLog)
+        .set({
+          completedAt: now,
+          status: emailsFailed > 0 && emailsSent === 0 ? "failed" : "completed",
+          emailsFound,
+          emailsSent,
+          emailsFailed,
+          emailsSkipped,
+        })
+        .where(eq(automationRunLog.id, runLogId));
+
+      // 7. Update job
+      const nextRun = new Date(Date.now() + getIntervalMs(job));
+      await db.update(automationJobs)
+        .set({
+          lastRunAt: now,
+          nextRunAt: nextRun.toISOString(),
+          lastRunStatus:
+            emailsFailed > 0 && emailsSent === 0 ? "failed" : "success",
+          lastRunStats: JSON.stringify({ emailsFound, emailsSent, emailsFailed, emailsSkipped }),
+          updatedAt: now,
+        })
+        .where(eq(automationJobs.id, jobId));
+
+      logger.info(
+        `Automacao "${job.name}" concluida: ${emailsSent} enviados, ${emailsFailed} falharam, ${emailsSkipped} ignorados`
+      );
     }
-
-    // 7. Update run log
-    const now = new Date().toISOString();
-    await db.update(automationRunLog)
-      .set({
-        completedAt: now,
-        status: emailsFailed > 0 && emailsSent === 0 ? "failed" : "completed",
-        emailsFound,
-        emailsSent,
-        emailsFailed,
-        emailsSkipped,
-      })
-      .where(eq(automationRunLog.id, runLogId));
-
-    // 8. Update job
-    const nextRun = new Date(
-      Date.now() + job.intervalDays * 86_400_000
-    );
-    const stats = JSON.stringify({
-      emailsFound,
-      emailsSent,
-      emailsFailed,
-      emailsSkipped,
-    });
-
-    await db.update(automationJobs)
-      .set({
-        lastRunAt: now,
-        nextRunAt: nextRun.toISOString(),
-        lastRunStatus:
-          emailsFailed > 0 && emailsSent === 0 ? "failed" : "success",
-        lastRunStats: stats,
-        updatedAt: now,
-      })
-      .where(eq(automationJobs.id, jobId));
-
-    logger.info(
-      `Automacao "${job.name}" concluida: ${emailsSent} enviados, ${emailsFailed} falharam, ${emailsSkipped} ignorados`
-    );
   } catch (err: any) {
     logger.error(`Automation job error (id=${jobId}): ${err.message}`);
 
@@ -356,25 +421,18 @@ export async function executeJob(jobId: number): Promise<void> {
       .where(eq(automationRunLog.id, runLogId));
 
     const now = new Date().toISOString();
-    const nextRun = new Date(
-      Date.now() + job.intervalDays * 86_400_000
-    );
+    const nextRun = new Date(Date.now() + getIntervalMs(job));
     await db.update(automationJobs)
       .set({
         lastRunAt: now,
         nextRunAt: nextRun.toISOString(),
         lastRunStatus: "failed",
-        lastRunStats: JSON.stringify({
-          emailsFound,
-          emailsSent,
-          emailsFailed,
-          emailsSkipped,
-        }),
+        lastRunStats: JSON.stringify({ emailsFound, emailsSent, emailsFailed, emailsSkipped }),
         updatedAt: now,
       })
       .where(eq(automationJobs.id, jobId));
   }
 
-  // 9. Reschedule
+  // Reschedule
   await scheduleJob(jobId);
 }

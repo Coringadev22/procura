@@ -49,6 +49,7 @@ export async function automationRoutes(app: FastifyInstance) {
   app.post<{
     Body: {
       name: string;
+      jobType?: string;
       searchKeyword?: string;
       searchUf?: string;
       searchQuantity?: number;
@@ -57,7 +58,8 @@ export async function automationRoutes(app: FastifyInstance) {
       gmailAccountId?: number;
       targetCategory?: string;
       sourceType?: string;
-      intervalDays: number;
+      intervalHours?: number;
+      intervalDays?: number;
       maxEmailsPerRun?: number;
     };
   }>("/api/automation/jobs", async (request) => {
@@ -66,6 +68,7 @@ export async function automationRoutes(app: FastifyInstance) {
       .insert(automationJobs)
       .values({
         name: body.name,
+        jobType: body.jobType || "email_send",
         searchKeyword: body.searchKeyword || "",
         searchUf: body.searchUf || null,
         searchQuantity: body.searchQuantity || 20,
@@ -74,7 +77,7 @@ export async function automationRoutes(app: FastifyInstance) {
         gmailAccountId: body.gmailAccountId || null,
         targetCategory: body.targetCategory || "all",
         sourceType: body.sourceType || "search",
-        intervalDays: body.intervalDays,
+        intervalHours: body.intervalHours || (body.intervalDays ? body.intervalDays * 24 : 24),
         maxEmailsPerRun: body.maxEmailsPerRun || 50,
       })
       .returning({ id: automationJobs.id });
@@ -87,6 +90,7 @@ export async function automationRoutes(app: FastifyInstance) {
     Params: { id: string };
     Body: {
       name?: string;
+      jobType?: string;
       searchKeyword?: string;
       searchUf?: string;
       searchQuantity?: number;
@@ -95,7 +99,7 @@ export async function automationRoutes(app: FastifyInstance) {
       gmailAccountId?: number;
       targetCategory?: string;
       sourceType?: string;
-      intervalDays?: number;
+      intervalHours?: number;
       maxEmailsPerRun?: number;
     };
   }>("/api/automation/jobs/:id", async (request) => {
@@ -106,6 +110,7 @@ export async function automationRoutes(app: FastifyInstance) {
     };
 
     if (body.name !== undefined) updates.name = body.name;
+    if (body.jobType !== undefined) updates.jobType = body.jobType;
     if (body.searchKeyword !== undefined)
       updates.searchKeyword = body.searchKeyword;
     if (body.searchUf !== undefined)
@@ -121,8 +126,8 @@ export async function automationRoutes(app: FastifyInstance) {
     if (body.targetCategory !== undefined)
       updates.targetCategory = body.targetCategory;
     if (body.sourceType !== undefined) updates.sourceType = body.sourceType;
-    if (body.intervalDays !== undefined)
-      updates.intervalDays = body.intervalDays;
+    if (body.intervalHours !== undefined)
+      updates.intervalHours = body.intervalHours;
     if (body.maxEmailsPerRun !== undefined)
       updates.maxEmailsPerRun = body.maxEmailsPerRun;
 
@@ -165,7 +170,7 @@ export async function automationRoutes(app: FastifyInstance) {
       if (!job) return { error: "Job nao encontrado" };
 
       const nextRun = new Date(
-        Date.now() + job.intervalDays * 86_400_000
+        Date.now() + job.intervalHours * 3_600_000
       );
 
       await db.update(automationJobs)

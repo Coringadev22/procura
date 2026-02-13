@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { eq, like, and, isNotNull, sql } from "drizzle-orm";
 import { db } from "../config/database.js";
 import { leads } from "../db/schema.js";
+import { classifyLead } from "../utils/email-category.js";
 
 export async function leadsRoutes(app: FastifyInstance) {
   // List leads (with optional filters)
@@ -176,4 +177,24 @@ export async function leadsRoutes(app: FastifyInstance) {
       return { success: true, categoria: next };
     }
   );
+
+  // Reclassify all leads using email + CNAE + razao social
+  app.post("/api/leads/reclassify", async () => {
+    const allLeads = await db.select().from(leads);
+    let reclassified = 0;
+    const changes: Array<{ cnpj: string; from: string; to: string }> = [];
+
+    for (const lead of allLeads) {
+      const newCategoria = classifyLead(lead.email, lead.cnaePrincipal, lead.razaoSocial);
+      if (newCategoria !== lead.categoria) {
+        await db.update(leads)
+          .set({ categoria: newCategoria })
+          .where(eq(leads.id, lead.id));
+        changes.push({ cnpj: lead.cnpj, from: lead.categoria, to: newCategoria });
+        reclassified++;
+      }
+    }
+
+    return { total: allLeads.length, reclassified, changes };
+  });
 }
