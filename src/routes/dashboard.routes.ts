@@ -780,13 +780,13 @@ function renderLeads() {
   let html = '<div class="results"><div class="results-header"><h3>' + (leadFilter === 'todos' ? 'Todos os Leads' : catLabel(leadFilter)) + ' (' + filtered.length + ')</h3>' +
     '<div style="font-size:12px;color:#64748b">Pagina ' + leadPage + ' de ' + totalPages + ' | Mostrando ' + (startIdx + 1) + '-' + Math.min(startIdx + leadsPerPage, filtered.length) + ' de ' + filtered.length + '</div>' +
     '</div><div class="table-wrap"><table><thead><tr>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'razaoSocial\')">Empresa' + sortIcon('razaoSocial') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'email\')">Email' + sortIcon('email') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'categoria\')">Categoria' + sortIcon('categoria') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'cnae\')">Atividade (CNAE)' + sortIcon('cnae') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'cidade\')">Cidade/UF' + sortIcon('cidade') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'origem\')">Origem' + sortIcon('origem') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'valor\')">Valor' + sortIcon('valor') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'razaoSocial\\')">Empresa' + sortIcon('razaoSocial') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'email\\')">Email' + sortIcon('email') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'categoria\\')">Categoria' + sortIcon('categoria') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'cnae\\')">Atividade (CNAE)' + sortIcon('cnae') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'cidade\\')">Cidade/UF' + sortIcon('cidade') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'origem\\')">Origem' + sortIcon('origem') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'valor\\')">Valor' + sortIcon('valor') + '</th>' +
     '<th></th>' +
     '</tr></thead><tbody>';
 
