@@ -260,7 +260,7 @@ const HTML = `<!DOCTYPE html>
         <button class="filter-btn" id="filter-provavel_contabilidade" onclick="filterLeads('provavel_contabilidade')">Prov. Contab.</button>
         <button class="filter-btn" id="filter-contabilidade" onclick="filterLeads('contabilidade')">Contabilidades</button>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
-        <input type="text" id="leads-cnae-filter" placeholder="Filtrar por CNAE / Atividade..." oninput="renderLeads()" style="padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px;width:200px">
+        <input type="text" id="leads-cnae-filter" placeholder="Filtrar por CNAE / Atividade..." oninput="leadPage=1;renderLeads()" style="padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px;width:200px">
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <button class="btn btn-green btn-sm" onclick="copyLeadEmails()">Copiar Emails</button>
         <button class="btn btn-primary btn-sm" onclick="exportLeadsCSV()">Exportar CSV</button>
@@ -584,6 +584,9 @@ let contPage = 1;
 // ============ LEADS (banco de dados) ============
 let leads = [];
 let leadFilter = 'todos';
+let leadSort = { col: 'razaoSocial', dir: 'asc' };
+let leadPage = 1;
+const leadsPerPage = 50;
 
 function autoCategoria(emailCategory, email) {
   if (emailCategory === 'contabilidade') return 'contabilidade';
@@ -697,6 +700,7 @@ async function toggleCategoria(cnpj) {
 }
 function filterLeads(f) {
   leadFilter = f;
+  leadPage = 1;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active','active-green','active-yellow','active-orange'));
   const btn = document.getElementById('filter-' + f);
   if (btn) {
@@ -707,6 +711,13 @@ function filterLeads(f) {
   }
   renderLeads();
 }
+function sortLeads(col) {
+  if (leadSort.col === col) leadSort.dir = leadSort.dir === 'asc' ? 'desc' : 'asc';
+  else { leadSort.col = col; leadSort.dir = 'asc'; }
+  leadPage = 1;
+  renderLeads();
+}
+function leadsGoPage(p) { leadPage = p; renderLeads(); }
 
 function renderLeads() {
   const statsEl = document.getElementById('leads-stats');
@@ -727,7 +738,7 @@ function renderLeads() {
 
   actionsEl.style.display = leads.length > 0 ? 'flex' : 'none';
 
-  let filtered = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  let filtered = leadFilter === 'todos' ? leads.slice() : leads.filter(l => l.categoria === leadFilter);
   const cnaeFilter = (document.getElementById('leads-cnae-filter')?.value || '').toLowerCase().trim();
   if (cnaeFilter) filtered = filtered.filter(l => (l.cnaePrincipal || '').toLowerCase().includes(cnaeFilter));
 
@@ -736,11 +747,50 @@ function renderLeads() {
     return;
   }
 
-  let html = '<div class="results"><div class="results-header"><h3>' + (leadFilter === 'todos' ? 'Todos os Leads' : catLabel(leadFilter)) + ' (' + filtered.length + ')</h3></div><div class="table-wrap"><table><thead><tr>' +
-    '<th>Empresa</th><th>Email</th><th>Categoria</th><th>Atividade (CNAE)</th><th>Cidade/UF</th><th>Origem</th><th>Valor</th><th></th>' +
+  // Sorting
+  const sc = leadSort.col;
+  const sd = leadSort.dir === 'asc' ? 1 : -1;
+  filtered.sort(function(a, b) {
+    let va, vb;
+    if (sc === 'valor') { va = Number(a.valorHomologado) || 0; vb = Number(b.valorHomologado) || 0; return (va - vb) * sd; }
+    if (sc === 'razaoSocial') { va = (a.razaoSocial || '').toLowerCase(); vb = (b.razaoSocial || '').toLowerCase(); }
+    else if (sc === 'email') { va = (a.email || '').toLowerCase(); vb = (b.email || '').toLowerCase(); }
+    else if (sc === 'categoria') { va = a.categoria || ''; vb = b.categoria || ''; }
+    else if (sc === 'cnae') { va = (a.cnaePrincipal || '').toLowerCase(); vb = (b.cnaePrincipal || '').toLowerCase(); }
+    else if (sc === 'cidade') { va = ((a.municipio || '') + (a.uf || '')).toLowerCase(); vb = ((b.municipio || '') + (b.uf || '')).toLowerCase(); }
+    else if (sc === 'origem') { va = (a.origem || '').toLowerCase(); vb = (b.origem || '').toLowerCase(); }
+    else { va = (a.razaoSocial || '').toLowerCase(); vb = (b.razaoSocial || '').toLowerCase(); }
+    if (va < vb) return -1 * sd;
+    if (va > vb) return 1 * sd;
+    return 0;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / leadsPerPage);
+  if (leadPage > totalPages) leadPage = totalPages;
+  if (leadPage < 1) leadPage = 1;
+  const startIdx = (leadPage - 1) * leadsPerPage;
+  const pageItems = filtered.slice(startIdx, startIdx + leadsPerPage);
+
+  function sortIcon(col) {
+    if (leadSort.col !== col) return ' <span style="color:#475569;font-size:10px">\\u2195</span>';
+    return leadSort.dir === 'asc' ? ' <span style="color:#3b82f6">\\u2191</span>' : ' <span style="color:#3b82f6">\\u2193</span>';
+  }
+
+  let html = '<div class="results"><div class="results-header"><h3>' + (leadFilter === 'todos' ? 'Todos os Leads' : catLabel(leadFilter)) + ' (' + filtered.length + ')</h3>' +
+    '<div style="font-size:12px;color:#64748b">Pagina ' + leadPage + ' de ' + totalPages + ' | Mostrando ' + (startIdx + 1) + '-' + Math.min(startIdx + leadsPerPage, filtered.length) + ' de ' + filtered.length + '</div>' +
+    '</div><div class="table-wrap"><table><thead><tr>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'razaoSocial\')">Empresa' + sortIcon('razaoSocial') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'email\')">Email' + sortIcon('email') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'categoria\')">Categoria' + sortIcon('categoria') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'cnae\')">Atividade (CNAE)' + sortIcon('cnae') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'cidade\')">Cidade/UF' + sortIcon('cidade') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'origem\')">Origem' + sortIcon('origem') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\'valor\')">Valor' + sortIcon('valor') + '</th>' +
+    '<th></th>' +
     '</tr></thead><tbody>';
 
-  filtered.forEach(l => {
+  pageItems.forEach(l => {
     const cnaeShort = (l.cnaePrincipal || '-').length > 40 ? (l.cnaePrincipal || '').substring(0,37) + '...' : (l.cnaePrincipal || '-');
     html += '<tr>' +
       '<td><div style="font-weight:600;font-size:12px">' + (l.razaoSocial || 'Sem nome') + '</div><div style="color:#475569;font-size:11px">' + l.cnpj + '</div></td>' +
@@ -754,7 +804,24 @@ function renderLeads() {
       '</tr>';
   });
 
-  html += '</tbody></table></div></div>';
+  html += '</tbody></table></div>';
+
+  // Pagination controls
+  if (totalPages > 1) {
+    html += '<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:12px;border-top:1px solid #334155">';
+    html += '<button class="btn btn-xs" style="background:#334155;color:' + (leadPage > 1 ? '#e2e8f0' : '#475569') + '" ' + (leadPage > 1 ? 'onclick="leadsGoPage(1)"' : 'disabled') + '>&laquo;</button>';
+    html += '<button class="btn btn-xs" style="background:#334155;color:' + (leadPage > 1 ? '#e2e8f0' : '#475569') + '" ' + (leadPage > 1 ? 'onclick="leadsGoPage(' + (leadPage - 1) + ')"' : 'disabled') + '>&lsaquo;</button>';
+    var startP = Math.max(1, leadPage - 3);
+    var endP = Math.min(totalPages, leadPage + 3);
+    for (var p = startP; p <= endP; p++) {
+      html += '<button class="btn btn-xs" style="background:' + (p === leadPage ? '#3b82f6' : '#334155') + ';color:#fff;min-width:32px" ' + (p !== leadPage ? 'onclick="leadsGoPage(' + p + ')"' : '') + '>' + p + '</button>';
+    }
+    html += '<button class="btn btn-xs" style="background:#334155;color:' + (leadPage < totalPages ? '#e2e8f0' : '#475569') + '" ' + (leadPage < totalPages ? 'onclick="leadsGoPage(' + (leadPage + 1) + ')"' : 'disabled') + '>&rsaquo;</button>';
+    html += '<button class="btn btn-xs" style="background:#334155;color:' + (leadPage < totalPages ? '#e2e8f0' : '#475569') + '" ' + (leadPage < totalPages ? 'onclick="leadsGoPage(' + totalPages + ')"' : 'disabled') + '>&raquo;</button>';
+    html += '</div>';
+  }
+
+  html += '</div>';
   resultsEl.innerHTML = html;
 }
 
