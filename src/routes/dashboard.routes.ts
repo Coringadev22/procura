@@ -157,6 +157,157 @@ const HTML = `<!DOCTYPE html>
       .stats { flex-direction: column; }
       .modal-content { padding: 20px; }
     }
+
+    /* Template Editor - Split Pane */
+    .tpl-editor-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 12px;
+      min-height: 500px;
+    }
+    .tpl-editor-pane {
+      display: flex;
+      flex-direction: column;
+    }
+    .tpl-editor-pane-header {
+      background: #162032;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tpl-toolbar {
+      display: flex;
+      gap: 4px;
+      padding: 8px 10px;
+      background: #1a2236;
+      border-bottom: 1px solid #334155;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .tpl-toolbar-btn {
+      background: #334155;
+      border: none;
+      color: #94a3b8;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .tpl-toolbar-btn:hover {
+      background: #475569;
+      color: #e2e8f0;
+    }
+    .tpl-toolbar-sep {
+      width: 1px;
+      height: 20px;
+      background: #475569;
+      margin: 0 4px;
+    }
+    .tpl-code-area {
+      flex: 1;
+      width: 100%;
+      background: #0f172a;
+      color: #e2e8f0;
+      border: none;
+      padding: 14px;
+      font-size: 13px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      resize: none;
+      outline: none;
+      line-height: 1.6;
+      tab-size: 2;
+    }
+    .tpl-preview-frame {
+      flex: 1;
+      border: none;
+      background: #fff;
+      width: 100%;
+    }
+    .tpl-starter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 12px 0;
+    }
+    .tpl-starter-card {
+      background: #162032;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .tpl-starter-card:hover {
+      border-color: #3b82f6;
+      background: #1a2744;
+    }
+    .tpl-starter-card.selected {
+      border-color: #22c55e;
+      background: #0a2a1a;
+    }
+    .tpl-starter-card h5 {
+      color: #f8fafc;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .tpl-starter-card p {
+      color: #64748b;
+      font-size: 11px;
+      margin: 0;
+    }
+    .tpl-var-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .tpl-var-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      z-index: 50;
+      min-width: 200px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      padding: 4px;
+    }
+    .tpl-var-menu.show { display: block; }
+    .tpl-var-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .tpl-var-item:hover { background: #334155; }
+    .tpl-var-item code {
+      color: #22c55e;
+      font-weight: 700;
+      margin-right: 8px;
+    }
+    @media (max-width: 900px) {
+      .tpl-editor-layout { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -427,15 +578,63 @@ const HTML = `<!DOCTYPE html>
 
         <div id="email-template-form" style="display:none;margin-bottom:16px;padding:16px;background:#0f172a;border-radius:10px;border:1px solid #334155">
           <input type="hidden" id="tpl-edit-id" value="">
+
+          <div id="tpl-starter-section">
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:8px">Comece com um template profissional ou inicie do zero:</div>
+            <div class="tpl-starter-grid">
+              <div class="tpl-starter-card" onclick="selectStarter('blank')"><h5>Em Branco</h5><p>Comece do zero</p></div>
+              <div class="tpl-starter-card" onclick="selectStarter('professional')"><h5>Profissional</h5><p>Layout corporativo clean</p></div>
+              <div class="tpl-starter-card" onclick="selectStarter('modern')"><h5>Moderno</h5><p>Design com gradiente e CTA</p></div>
+            </div>
+          </div>
+
           <div class="form-row">
             <div class="form-group" style="flex:2"><label>Nome do Template</label><input type="text" id="tpl-name" placeholder="Ex: Proposta para empresas"></div>
             <div class="form-group" style="flex:1"><label>Categoria Alvo</label><select id="tpl-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Todos</option><option value="empresa">Empresa</option><option value="contabilidade">Contabilidade</option></select></div>
           </div>
           <div class="form-group" style="margin-top:12px"><label>Assunto</label><input type="text" id="tpl-subject" placeholder="Ex: Proposta de parceria - {empresa}"></div>
-          <div class="form-group" style="margin-top:12px"><label>Corpo do Email (HTML, use {empresa}, {cnpj}, {valor}, {cidade}, {uf}, {contato})</label><textarea id="tpl-body" rows="8" style="width:100%;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:12px;font-size:13px;font-family:monospace;resize:vertical" placeholder="Prezado(a) {contato},&#10;&#10;Gostaríamos de apresentar nossos serviços..."></textarea></div>
-          <div style="margin-top:12px;display:flex;gap:8px">
+
+          <div class="tpl-editor-layout">
+            <div class="tpl-editor-pane" style="border-right:1px solid #334155">
+              <div class="tpl-editor-pane-header"><span>Codigo HTML</span></div>
+              <div class="tpl-toolbar">
+                <button class="tpl-toolbar-btn" onclick="tplInsertTag('b')" title="Negrito"><b>B</b></button>
+                <button class="tpl-toolbar-btn" onclick="tplInsertTag('i')" title="Italico"><i>I</i></button>
+                <button class="tpl-toolbar-btn" onclick="tplInsertTag('u')" title="Sublinhado"><u>U</u></button>
+                <div class="tpl-toolbar-sep"></div>
+                <button class="tpl-toolbar-btn" onclick="tplInsertTag('h2')" title="Titulo">H</button>
+                <button class="tpl-toolbar-btn" onclick="tplInsertLink()" title="Link">Link</button>
+                <button class="tpl-toolbar-btn" onclick="tplInsertImage()" title="Imagem">Img</button>
+                <div class="tpl-toolbar-sep"></div>
+                <div class="tpl-var-dropdown">
+                  <button class="tpl-toolbar-btn" onclick="toggleVarMenu()" style="background:#0a2a1a;color:#22c55e">{var}</button>
+                  <div class="tpl-var-menu" id="tpl-var-menu">
+                    <button class="tpl-var-item" onclick="tplInsertVar('empresa')"><code>{empresa}</code> Razao Social</button>
+                    <button class="tpl-var-item" onclick="tplInsertVar('cnpj')"><code>{cnpj}</code> CNPJ</button>
+                    <button class="tpl-var-item" onclick="tplInsertVar('contato')"><code>{contato}</code> Nome Contato</button>
+                    <button class="tpl-var-item" onclick="tplInsertVar('email')"><code>{email}</code> Email</button>
+                    <button class="tpl-var-item" onclick="tplInsertVar('valor')"><code>{valor}</code> Valor</button>
+                    <button class="tpl-var-item" onclick="tplInsertVar('cidade')"><code>{cidade}</code> Cidade</button>
+                    <button class="tpl-var-item" onclick="tplInsertVar('uf')"><code>{uf}</code> Estado</button>
+                  </div>
+                </div>
+              </div>
+              <textarea id="tpl-body" class="tpl-code-area" oninput="updateTplPreview()" placeholder="Digite ou cole o HTML do email aqui..."></textarea>
+            </div>
+            <div class="tpl-editor-pane">
+              <div class="tpl-editor-pane-header">
+                <span>Preview</span>
+                <span style="font-size:10px;color:#475569;text-transform:none;font-weight:400">Atualiza em tempo real</span>
+              </div>
+              <iframe id="tpl-preview-iframe" class="tpl-preview-frame" sandbox="allow-same-origin"></iframe>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
             <button class="btn btn-green btn-sm" onclick="saveTemplate()">Salvar Template</button>
             <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="hideTemplateForm()">Cancelar</button>
+            <span style="flex:1"></span>
+            <span style="font-size:11px;color:#475569">Use {empresa}, {cnpj}, {contato}, {valor}, {cidade}, {uf} no corpo e assunto</span>
           </div>
         </div>
 
@@ -465,14 +664,6 @@ const HTML = `<!DOCTYPE html>
         </div>
         <div id="email-send-preview" style="margin-top:12px;font-size:12px;color:#94a3b8"></div>
         <div id="email-send-results" style="margin-top:12px"></div>
-      </div>
-
-      <div class="search-box" style="margin-top:20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <h2>Caixa de Entrada</h2>
-          <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="loadInbox()">Atualizar</button>
-        </div>
-        <div id="email-inbox-list"><div style="color:#64748b;font-size:13px;padding:8px">Carregando...</div></div>
       </div>
 
       <div style="margin-top:20px" id="email-history"></div>
@@ -1431,6 +1622,107 @@ async function lookupCnpj() {
   }
 }
 
+// ============ STARTER TEMPLATES ============
+const STARTER_TEMPLATES = {
+  blank: '',
+  professional: '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f4f4f7;font-family:Arial,Helvetica,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><tr><td style="background:#1e293b;padding:28px 40px"><h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700">Alvaro Gonzaga</h1></td></tr><tr><td style="padding:32px 40px"><p style="color:#334155;font-size:15px;line-height:1.7;margin:0 0 16px">Prezado(a) <strong>{contato}</strong>,</p><p style="color:#334155;font-size:15px;line-height:1.7;margin:0 0 16px">Gostaríamos de apresentar nossos serviços para a <strong>{empresa}</strong>.</p><p style="color:#334155;font-size:15px;line-height:1.7;margin:0 0 24px">Temos ampla experiência no atendimento a empresas de {cidade}/{uf} e gostaríamos de agendar uma conversa para apresentar como podemos ajudar.</p><table cellpadding="0" cellspacing="0"><tr><td style="background:#3b82f6;border-radius:6px;padding:12px 28px"><a href="mailto:{email}" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px">Responder Email</a></td></tr></table><p style="color:#64748b;font-size:13px;line-height:1.6;margin:24px 0 0">Atenciosamente,<br><strong>Alvaro Gonzaga</strong></p></td></tr><tr><td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0"><p style="color:#94a3b8;font-size:11px;margin:0;text-align:center">Email enviado para {email} | CNPJ: {cnpj}</p></td></tr></table></td></tr></table></body></html>',
+  modern: '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#0f172a;font-family:Segoe UI,Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:40px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#1e293b;border-radius:12px;overflow:hidden"><tr><td style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);padding:36px 40px;text-align:center"><h1 style="margin:0;color:#fff;font-size:26px;font-weight:800">Transforme seu Negocio</h1><p style="color:rgba(255,255,255,0.85);font-size:14px;margin:8px 0 0">Solucoes sob medida para {empresa}</p></td></tr><tr><td style="padding:32px 40px"><p style="color:#e2e8f0;font-size:15px;line-height:1.7;margin:0 0 16px">Ola <strong style="color:#fff">{contato}</strong>,</p><p style="color:#94a3b8;font-size:15px;line-height:1.7;margin:0 0 20px">Identificamos que a <strong style="color:#e2e8f0">{empresa}</strong> em {cidade}/{uf} pode se beneficiar dos nossos servicos.</p><table width="100%" cellpadding="0" cellspacing="0" style="background:#162032;border-radius:8px;margin:0 0 20px"><tr><td style="padding:20px"><p style="color:#f8fafc;font-size:14px;font-weight:700;margin:0 0 8px">O que oferecemos:</p><p style="color:#94a3b8;font-size:13px;line-height:1.8;margin:0">&#10003; Consultoria especializada<br>&#10003; Atendimento personalizado<br>&#10003; Resultados comprovados</p></td></tr></table><table cellpadding="0" cellspacing="0" style="margin:0 auto"><tr><td style="background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:8px;padding:14px 32px"><a href="mailto:{email}" style="color:#fff;text-decoration:none;font-weight:700;font-size:14px">Quero Saber Mais</a></td></tr></table></td></tr><tr><td style="padding:20px 40px;border-top:1px solid #334155;text-align:center"><p style="color:#475569;font-size:11px;margin:0">{empresa} | CNPJ: {cnpj} | {cidade}/{uf}</p></td></tr></table></td></tr></table></body></html>'
+};
+
+const SAMPLE_VARS = {
+  empresa: 'Empresa Teste LTDA',
+  cnpj: '12.345.678/0001-90',
+  email: 'teste@empresa.com',
+  contato: 'Joao da Silva',
+  valor: 'R$ 150.000,00',
+  cidade: 'Sao Paulo',
+  uf: 'SP'
+};
+
+function selectStarter(key) {
+  document.querySelectorAll('.tpl-starter-card').forEach(c => c.classList.remove('selected'));
+  if (event && event.currentTarget) event.currentTarget.classList.add('selected');
+  document.getElementById('tpl-body').value = STARTER_TEMPLATES[key] || '';
+  updateTplPreview();
+}
+
+function updateTplPreview() {
+  const body = document.getElementById('tpl-body').value;
+  const iframe = document.getElementById('tpl-preview-iframe');
+  if (!iframe) return;
+  let rendered = body;
+  Object.keys(SAMPLE_VARS).forEach(k => {
+    rendered = rendered.replace(new RegExp('\\\\{' + k + '\\\\}', 'g'), SAMPLE_VARS[k]);
+  });
+  if (!rendered.toLowerCase().includes('<html') && !rendered.toLowerCase().includes('<body')) {
+    rendered = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px;color:#333;line-height:1.6;}</style></head><body>' + rendered + '</body></html>';
+  }
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(rendered);
+  doc.close();
+}
+
+function tplInsertTag(tag) {
+  const ta = document.getElementById('tpl-body');
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const selected = ta.value.substring(start, end);
+  const replacement = '<' + tag + '>' + (selected || 'texto') + '</' + tag + '>';
+  ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+  ta.selectionStart = start + tag.length + 2;
+  ta.selectionEnd = start + tag.length + 2 + (selected || 'texto').length;
+  ta.focus();
+  updateTplPreview();
+}
+
+function tplInsertLink() {
+  const url = prompt('URL do link:', 'https://');
+  if (!url) return;
+  const ta = document.getElementById('tpl-body');
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const selected = ta.value.substring(start, end) || 'clique aqui';
+  const html = '<a href="' + url + '" style="color:#3b82f6;text-decoration:underline">' + selected + '</a>';
+  ta.value = ta.value.substring(0, start) + html + ta.value.substring(end);
+  ta.focus();
+  updateTplPreview();
+}
+
+function tplInsertImage() {
+  const url = prompt('URL da imagem:', 'https://');
+  if (!url) return;
+  const width = prompt('Largura da imagem (px ou %):', '100%');
+  const ta = document.getElementById('tpl-body');
+  const pos = ta.selectionStart;
+  const html = '<img src="' + url + '" alt="Imagem" style="max-width:' + (width || '100%') + ';height:auto;display:block;margin:12px 0" />';
+  ta.value = ta.value.substring(0, pos) + html + ta.value.substring(pos);
+  ta.focus();
+  updateTplPreview();
+}
+
+function tplInsertVar(varName) {
+  const ta = document.getElementById('tpl-body');
+  const pos = ta.selectionStart;
+  const text = '{' + varName + '}';
+  ta.value = ta.value.substring(0, pos) + text + ta.value.substring(pos);
+  ta.selectionStart = ta.selectionEnd = pos + text.length;
+  ta.focus();
+  toggleVarMenu();
+  updateTplPreview();
+}
+
+function toggleVarMenu() {
+  document.getElementById('tpl-var-menu').classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.tpl-var-dropdown')) {
+    const menu = document.getElementById('tpl-var-menu');
+    if (menu) menu.classList.remove('show');
+  }
+});
+
 // ============ EMAIL (RESEND) ============
 let emailConfigured = false;
 let emailTemplates = [];
@@ -1467,7 +1759,6 @@ async function loadEmailStatus() {
     document.getElementById('email-quota').textContent = (data.todaySent || 0) + ' emails enviados hoje | ' + (data.totalSent || 0) + ' total';
     await loadTemplates();
     updateSendPreview();
-    loadInbox();
   } catch(e) {
     document.getElementById('email-status-box').innerHTML = '<strong>Erro:</strong> ' + e.message;
   }
@@ -1493,6 +1784,7 @@ function renderTemplatesList() {
         '<div><strong style="color:#f8fafc">' + t.name + '</strong> <span class="badge badge-blue" style="font-size:10px">' + catText + '</span>' +
         '<div style="color:#64748b;font-size:12px;margin-top:2px">Assunto: ' + t.subject + '</div></div>' +
         '<div style="display:flex;gap:6px">' +
+          '<button class="btn btn-xs" style="background:#8b5cf6;color:#fff" onclick="quickPreviewTemplate(' + t.id + ')">Preview</button>' +
           '<button class="btn btn-primary btn-xs" onclick="editTemplate(' + t.id + ')">Editar</button>' +
           '<button class="btn btn-red btn-xs" onclick="deleteTemplate(' + t.id + ')">Excluir</button>' +
         '</div>' +
@@ -1523,7 +1815,9 @@ function updateSendPreview() {
 function showTemplateForm(id) {
   document.getElementById('email-template-form').style.display = 'block';
   document.getElementById('tpl-edit-id').value = id || '';
+  const starterSection = document.getElementById('tpl-starter-section');
   if (id) {
+    if (starterSection) starterSection.style.display = 'none';
     const t = emailTemplates.find(x => x.id === id);
     if (t) {
       document.getElementById('tpl-name').value = t.name;
@@ -1532,15 +1826,37 @@ function showTemplateForm(id) {
       document.getElementById('tpl-category').value = t.targetCategory || '';
     }
   } else {
+    if (starterSection) starterSection.style.display = 'block';
+    document.querySelectorAll('.tpl-starter-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('tpl-name').value = '';
     document.getElementById('tpl-subject').value = '';
     document.getElementById('tpl-body').value = '';
     document.getElementById('tpl-category').value = '';
   }
+  setTimeout(updateTplPreview, 50);
 }
 
 function hideTemplateForm() {
   document.getElementById('email-template-form').style.display = 'none';
+}
+
+async function quickPreviewTemplate(id) {
+  try {
+    const data = await apiPost('/api/email/preview-template', { templateId: id });
+    const modal = document.getElementById('lic-modal');
+    const body = document.getElementById('lic-modal-body');
+    body.innerHTML = '<h3 style="color:#f8fafc;margin-bottom:8px">' + (data.templateName || 'Template') + '</h3>' +
+      '<div style="font-size:12px;color:#64748b;margin-bottom:12px">Assunto: <strong style="color:#e2e8f0">' + (data.subject || '') + '</strong></div>' +
+      '<iframe id="quick-preview-frame" style="width:100%;height:500px;border:1px solid #334155;border-radius:8px;background:#fff" sandbox="allow-same-origin"></iframe>';
+    modal.classList.add('show');
+    setTimeout(() => {
+      const f = document.getElementById('quick-preview-frame');
+      if (f) {
+        const doc = f.contentDocument || f.contentWindow.document;
+        doc.open(); doc.write(data.body || ''); doc.close();
+      }
+    }, 50);
+  } catch(e) { showToast('Erro no preview: ' + e.message, true); }
 }
 
 async function saveTemplate() {
@@ -1912,42 +2228,23 @@ document.getElementById('cnpj-input').addEventListener('keydown', e => { if(e.ke
 // Escape to close modals
 document.addEventListener('keydown', e => { if(e.key==='Escape') { closeLicModal(); closeTestModal(); } });
 
+// Tab key inserts spaces in template editor
+const tplBodyEl = document.getElementById('tpl-body');
+if (tplBodyEl) tplBodyEl.addEventListener('keydown', function(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = this.selectionStart;
+    const end = this.selectionEnd;
+    this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+    this.selectionStart = this.selectionEnd = start + 2;
+    updateTplPreview();
+  }
+});
+
 // Load leads from database on startup
 loadLeads();
 
-// ============ INBOX ============
-async function loadInbox() {
-  const el = document.getElementById('email-inbox-list');
-  try {
-    const msgs = await apiFetch('/api/email/inbox');
-    if (!msgs.length) {
-      el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px">Nenhum email recebido ainda.</div>';
-      return;
-    }
-    let html = '<div class="table-wrap"><table><thead><tr><th>De</th><th>Assunto</th><th>Data</th><th>Lead</th><th></th></tr></thead><tbody>';
-    msgs.forEach(m => {
-      const isRead = m.isRead;
-      html += '<tr style="' + (isRead ? '' : 'background:#162032') + '">' +
-        '<td style="font-size:12px;font-weight:' + (isRead ? '400' : '600') + '">' + (m.fromName || m.fromEmail) + '<div style="color:#475569;font-size:11px">' + m.fromEmail + '</div></td>' +
-        '<td style="font-size:12px;font-weight:' + (isRead ? '400' : '600') + '">' + (m.subject || '(sem assunto)') + '</td>' +
-        '<td style="font-size:11px;white-space:nowrap;color:#64748b">' + new Date(m.receivedAt).toLocaleString('pt-BR') + '</td>' +
-        '<td>' + (m.leadCnpj ? '<span class="badge badge-green" style="font-size:10px">Lead</span>' : '') + '</td>' +
-        '<td style="display:flex;gap:4px">' +
-          (!isRead ? '<button class="btn btn-xs btn-primary" onclick="markInboxRead(' + m.id + ')">Lido</button>' : '<span class="badge badge-gray">Lido</span>') +
-        '</td>' +
-      '</tr>';
-    });
-    html += '</tbody></table></div>';
-    el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div style="color:#fca5a5;font-size:12px">Erro: ' + e.message + '</div>'; }
-}
 
-async function markInboxRead(id) {
-  try {
-    await fetch(API + '/api/email/inbox/' + id + '/read', { method: 'PATCH' });
-    loadInbox();
-  } catch(e) { showToast('Erro: ' + e.message, true); }
-}
 </script>
 </body>
 </html>`;
