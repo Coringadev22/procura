@@ -506,7 +506,7 @@ const HTML = `<!DOCTYPE html>
           </div>
           <div class="form-row" style="margin-top:12px">
             <div class="form-group"><label>Filtro CNAE (opcional)</label><input type="text" id="auto-cnae" placeholder="Ex: informatica, alimentacao..."></div>
-            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="transparencia">Portal Transparencia</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
+            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="transparencia">TransfereGov - Consorcios</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
           </div>
           <div id="auto-email-fields" class="form-row" style="margin-top:12px;display:none">
             <div class="form-group"><label>Conta Gmail</label><select id="auto-gmail" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
@@ -688,7 +688,7 @@ function fonteBadge(f) {
   return c[f] || 'badge-gray';
 }
 function fonteLabel(f) {
-  var c = { pncp:'PNCP', pncp_contratos:'PNCP Contratos', sicaf:'SICAF', tce_rj:'TCE-RJ', transparencia:'Transparencia', manual:'Manual', fornecedores:'Fornecedores' };
+  var c = { pncp:'PNCP', pncp_contratos:'PNCP Contratos', sicaf:'SICAF', tce_rj:'TCE-RJ', transparencia:'TransfereGov', manual:'Manual', fornecedores:'Fornecedores' };
   if (c[f]) return c[f];
   if (f && f.startsWith('auto_job_')) return 'PNCP';
   return f || '-';
