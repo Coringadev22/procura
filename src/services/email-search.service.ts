@@ -58,39 +58,44 @@ export async function runEmailSearch(params: EmailSearchParams): Promise<EmailSe
 
   if (uf) {
     // Use Consulta API with native UF filter (much more efficient per state)
+    // The API requires codigoModalidadeContratacao, so we query the top modalidades:
+    // 6=Pregão Eletrônico, 8=Dispensa, 4=Concorrência, 9=Inexigibilidade
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const di = dataInicial || thirtyDaysAgo.toISOString().slice(0, 10).replace(/-/g, "");
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const di = dataInicial || ninetyDaysAgo.toISOString().slice(0, 10).replace(/-/g, "");
     const df = dataFinal || now.toISOString().slice(0, 10).replace(/-/g, "");
 
     logger.info(
-      `Busca-emails: UF=${uf} via Consulta API ${di}-${df}, buscando ate ${minResultados} licitacoes com resultado`
+      `Busca-emails: UF=${uf} via Consulta API ${di}-${df}, buscando ate ${minResultados} licitacoes`
     );
 
-    const maxPages = 10;
+    const modalidades = [6, 8, 4, 9]; // Pregão, Dispensa, Concorrência, Inexigibilidade
     const pageSize = 50;
 
-    for (let page = 1; page <= maxPages; page++) {
-      try {
-        const result = await searchContratacoesByDate({
-          dataInicial: di,
-          dataFinal: df,
-          uf,
-          pagina: page,
-          tamanhoPagina: pageSize,
-        });
+    for (const mod of modalidades) {
+      if (comResultado.length >= minResultados) break;
 
-        if (!result.data || result.data.length === 0) break;
-        totalAnalisadas += result.data.length;
+      for (let page = 1; page <= 5; page++) {
+        try {
+          const result = await searchContratacoesByDate({
+            dataInicial: di,
+            dataFinal: df,
+            codigoModalidade: mod,
+            uf,
+            pagina: page,
+            tamanhoPagina: pageSize,
+          });
 
-        for (const c of result.data) {
-          if (c.existeResultado) {
+          if (!result.data || result.data.length === 0) break;
+          totalAnalisadas += result.data.length;
+
+          for (const c of result.data) {
             comResultado.push({
               orgao_cnpj: c.orgaoEntidade.cnpj,
               orgao_nome: c.orgaoEntidade.razaoSocial,
               uf: c.unidadeOrgao.ufSigla,
               municipio_nome: c.unidadeOrgao.municipioNome,
-              tem_resultado: true,
+              tem_resultado: true, // enrichment will verify
               ano: String(c.anoCompra),
               numero_sequencial: String(c.sequencialCompra),
               description: c.objetoCompra,
@@ -98,17 +103,17 @@ export async function runEmailSearch(params: EmailSearchParams): Promise<EmailSe
               numero_controle_pncp: c.numeroControlePNCP,
             } as PncpSearchItem);
           }
+
+          logger.info(
+            `  Modalidade ${mod} pag ${page}: ${result.data.length} contratacoes, ${comResultado.length} acumuladas`
+          );
+
+          if (comResultado.length >= minResultados) break;
+          if (result.data.length < pageSize) break;
+        } catch (err: any) {
+          logger.error(`Consulta API mod=${mod} page ${page} error: ${err.message}`);
+          break;
         }
-
-        logger.info(
-          `  Pagina ${page}: ${result.data.length} contratacoes, ${comResultado.length} com resultado ate agora`
-        );
-
-        if (comResultado.length >= minResultados) break;
-        if (result.data.length < pageSize) break;
-      } catch (err: any) {
-        logger.error(`Consulta API page ${page} error: ${err.message}`);
-        break;
       }
     }
   } else {
