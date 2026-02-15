@@ -227,8 +227,17 @@ export async function executeJob(jobId: number): Promise<void> {
             });
           }
         }
+        logger.info(`Data source ${job.sourceType}: ${sourceResults.length} resultados, ${recipientMap.size} no recipientMap`);
       } catch (err: any) {
         logger.error(`Data source ${job.sourceType} error: ${err.message}`);
+        // Surface error in job stats so it's visible in the dashboard
+        const now = new Date().toISOString();
+        await db.update(automationJobs)
+          .set({
+            lastRunStats: JSON.stringify({ error: `${job.sourceType}: ${err.message}` }),
+            updatedAt: now,
+          })
+          .where(eq(automationJobs.id, jobId));
       }
     } else if (job.sourceType === "search" || job.sourceType === "both") {
       // Legacy: use old search flow
