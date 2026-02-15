@@ -319,7 +319,7 @@ export async function executeJob(jobId: number): Promise<void> {
           email: r.email?.toLowerCase() || null,
           telefones: r.telefones || null,
           municipio: r.municipio || null,
-          uf: r.uf || null,
+          uf: r.uf || job.searchUf || null,
           cnaePrincipal: r.cnaePrincipal || null,
           origem: "auto_job_" + jobId,
           fonte: activeFonte,

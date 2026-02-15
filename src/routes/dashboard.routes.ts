@@ -260,6 +260,7 @@ const HTML = `<!DOCTYPE html>
         <button class="filter-btn" id="filter-contabilidade" onclick="filterLeads('contabilidade')">Contabilidades</button>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <input type="text" id="leads-cnae-filter" placeholder="Filtrar por CNAE / Atividade..." oninput="leadPage=1;renderLeads()" style="padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px;width:200px">
+        <select id="leads-uf-filter" onchange="leadPage=1;renderLeads()" style="padding:6px 10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px"><option value="all">Todos UFs</option><option value="AC">AC</option><option value="AL">AL</option><option value="AM">AM</option><option value="AP">AP</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MG">MG</option><option value="MS">MS</option><option value="MT">MT</option><option value="PA">PA</option><option value="PB">PB</option><option value="PE">PE</option><option value="PI">PI</option><option value="PR">PR</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RO">RO</option><option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option><option value="SE">SE</option><option value="SP">SP</option><option value="TO">TO</option></select>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <button class="btn btn-green btn-sm" onclick="copyLeadEmails()">Copiar Emails</button>
         <button class="btn btn-primary btn-sm" onclick="exportLeadsCSV()">Exportar CSV</button>
@@ -746,9 +747,11 @@ function renderLeads() {
   let filtered = leadFilter === 'todos' ? leads.slice() : leads.filter(l => l.categoria === leadFilter);
   const cnaeFilter = (document.getElementById('leads-cnae-filter')?.value || '').toLowerCase().trim();
   if (cnaeFilter) filtered = filtered.filter(l => (l.cnaePrincipal || '').toLowerCase().includes(cnaeFilter));
+  const ufFilter = document.getElementById('leads-uf-filter')?.value || 'all';
+  if (ufFilter && ufFilter !== 'all') filtered = filtered.filter(l => (l.uf || '').toUpperCase() === ufFilter);
 
   if (filtered.length === 0) {
-    resultsEl.innerHTML = '<div class="results"><div class="empty">' + (leads.length === 0 ? 'Nenhum lead adicionado ainda. Use o botao "+" nas abas de Busca de Emails, Fornecedores ou Contratos.' : 'Nenhum lead nesta categoria' + (cnaeFilter ? ' com este CNAE' : '') + '.') + '</div></div>';
+    resultsEl.innerHTML = '<div class="results"><div class="empty">' + (leads.length === 0 ? 'Nenhum lead adicionado ainda. Use o botao "+" nas abas de Busca de Emails, Fornecedores ou Contratos.' : 'Nenhum lead neste filtro.') + '</div></div>';
     return;
   }
 
@@ -830,15 +833,24 @@ function renderLeads() {
   resultsEl.innerHTML = html;
 }
 
+function getFilteredLeads() {
+  var f = leadFilter === 'todos' ? leads.slice() : leads.filter(l => l.categoria === leadFilter);
+  var ufF = document.getElementById('leads-uf-filter')?.value || 'all';
+  if (ufF && ufF !== 'all') f = f.filter(l => (l.uf || '').toUpperCase() === ufF);
+  var cnaeF = (document.getElementById('leads-cnae-filter')?.value || '').toLowerCase().trim();
+  if (cnaeF) f = f.filter(l => (l.cnaePrincipal || '').toLowerCase().includes(cnaeF));
+  return f;
+}
+
 function copyLeadEmails() {
-  const source = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  const source = getFilteredLeads();
   const emails = source.filter(l => l.email).map(l => l.email);
-  if (emails.length === 0) return showToast('Nenhum lead com email' + (leadFilter !== 'todos' ? ' nesta categoria' : ''), true);
+  if (emails.length === 0) return showToast('Nenhum lead com email neste filtro', true);
   navigator.clipboard.writeText(emails.join('\\n')).then(() => showToast(emails.length + ' emails copiados!'));
 }
 
 function exportLeadsCSV() {
-  const source = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
+  const source = getFilteredLeads();
   if (source.length === 0) return showToast('Nenhum lead para exportar', true);
   const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Fonte,Categoria,Valor Homologado';
   const rows = source.map(l => {
@@ -848,7 +860,8 @@ function exportLeadsCSV() {
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'procura-leads-' + (leadFilter !== 'todos' ? leadFilter + '-' : '') + new Date().toISOString().split('T')[0] + '.csv';
+  var ufF = document.getElementById('leads-uf-filter')?.value || 'all';
+  a.download = 'procura-leads-' + (ufF !== 'all' ? ufF + '-' : '') + (leadFilter !== 'todos' ? leadFilter + '-' : '') + new Date().toISOString().split('T')[0] + '.csv';
   a.click();
   showToast('CSV exportado com ' + source.length + ' leads!');
 }

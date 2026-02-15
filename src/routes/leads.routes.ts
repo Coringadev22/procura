@@ -7,9 +7,9 @@ import { classifyLead } from "../utils/email-category.js";
 export async function leadsRoutes(app: FastifyInstance) {
   // List leads (with optional filters)
   app.get<{
-    Querystring: { categoria?: string; cnae?: string };
+    Querystring: { categoria?: string; cnae?: string; uf?: string };
   }>("/api/leads", async (request) => {
-    const { categoria, cnae } = request.query;
+    const { categoria, cnae, uf } = request.query;
     const conditions = [];
 
     if (categoria && categoria !== "all") {
@@ -17,6 +17,9 @@ export async function leadsRoutes(app: FastifyInstance) {
     }
     if (cnae) {
       conditions.push(like(leads.cnaePrincipal, `%${cnae}%`));
+    }
+    if (uf && uf !== "all") {
+      conditions.push(eq(leads.uf, uf.toUpperCase()));
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
