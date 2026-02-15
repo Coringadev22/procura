@@ -1,12 +1,21 @@
 import { fetchWithRetry } from "../utils/retry.js";
 import { enrichLicitacao } from "./email-enrichment.service.js";
-import { searchContratacoesByDate } from "./pncp-consulta.service.js";
 import { lookupMultipleCnpjs } from "./cnpj-lookup.service.js";
 import { logger } from "../utils/logger.js";
 import type { FornecedorComEmail } from "../types/api.types.js";
 import type { PncpSearchItem, PncpSearchResponse } from "../types/pncp.types.js";
 
 const PNCP_SEARCH_URL = "https://pncp.gov.br/api/search";
+
+const UF_NAMES: Record<string, string> = {
+  AC: "Acre", AL: "Alagoas", AM: "Amazonas", AP: "Amapa",
+  BA: "Bahia", CE: "Ceara", DF: "Distrito Federal", ES: "Espirito Santo",
+  GO: "Goias", MA: "Maranhao", MG: "Minas Gerais", MS: "Mato Grosso do Sul",
+  MT: "Mato Grosso", PA: "Para", PB: "Paraiba", PE: "Pernambuco",
+  PI: "Piaui", PR: "Parana", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte",
+  RO: "Rondonia", RR: "Roraima", RS: "Rio Grande do Sul", SC: "Santa Catarina",
+  SE: "Sergipe", SP: "Sao Paulo", TO: "Tocantins",
+};
 
 async function fetchSearchPage(
   q: string,
@@ -57,64 +66,48 @@ export async function runEmailSearch(params: EmailSearchParams): Promise<EmailSe
   let totalAnalisadas = 0;
 
   if (uf) {
-    // Use Consulta API with native UF filter (much more efficient per state)
-    // The API requires codigoModalidadeContratacao, so we query the top modalidades:
-    // 6=Pregão Eletrônico, 8=Dispensa, 4=Concorrência, 9=Inexigibilidade
-    const now = new Date();
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const di = dataInicial || ninetyDaysAgo.toISOString().slice(0, 10).replace(/-/g, "");
-    const df = dataFinal || now.toISOString().slice(0, 10).replace(/-/g, "");
-
-    logger.info(
-      `Busca-emails: UF=${uf} via Consulta API ${di}-${df}, buscando ate ${minResultados} licitacoes`
-    );
-
-    const modalidades = [6, 8, 4, 9]; // Pregão, Dispensa, Concorrência, Inexigibilidade
+    // Use state name as search query to bias results towards that UF
+    // This is much more effective than generic q="" which is dominated by big states
+    const stateName = UF_NAMES[uf.toUpperCase()] || uf;
+    const searchQuery = q || stateName;
+    const maxPages = 30;
     const pageSize = 50;
 
-    for (const mod of modalidades) {
-      if (comResultado.length >= minResultados) break;
+    logger.info(
+      `Busca-emails: UF=${uf} q="${searchQuery}" buscando ate ${minResultados} licitacoes com resultado`
+    );
 
-      for (let page = 1; page <= 5; page++) {
-        try {
-          const result = await searchContratacoesByDate({
-            dataInicial: di,
-            dataFinal: df,
-            codigoModalidade: mod,
-            uf,
-            pagina: page,
-            tamanhoPagina: pageSize,
-          });
+    for (let page = 1; page <= maxPages; page++) {
+      const result = await fetchSearchPage(searchQuery, page, pageSize);
+      let items = result.items;
 
-          if (!result.data || result.data.length === 0) break;
-          totalAnalisadas += result.data.length;
+      if (!items || items.length === 0) break;
 
-          for (const c of result.data) {
-            comResultado.push({
-              orgao_cnpj: c.orgaoEntidade.cnpj,
-              orgao_nome: c.orgaoEntidade.razaoSocial,
-              uf: c.unidadeOrgao.ufSigla,
-              municipio_nome: c.unidadeOrgao.municipioNome,
-              tem_resultado: true, // enrichment will verify
-              ano: String(c.anoCompra),
-              numero_sequencial: String(c.sequencialCompra),
-              description: c.objetoCompra,
-              data_publicacao_pncp: c.dataPublicacaoPncp,
-              numero_controle_pncp: c.numeroControlePNCP,
-            } as PncpSearchItem);
-          }
+      items = items.filter((item) => item.uf === uf.toUpperCase());
 
-          logger.info(
-            `  Modalidade ${mod} pag ${page}: ${result.data.length} contratacoes, ${comResultado.length} acumuladas`
-          );
+      if (dataInicial || dataFinal) {
+        items = items.filter((item) => {
+          const pubDate = item.data_publicacao_pncp?.substring(0, 10).replace(/-/g, "");
+          if (dataInicial && pubDate < dataInicial) return false;
+          if (dataFinal && pubDate > dataFinal) return false;
+          return true;
+        });
+      }
 
-          if (comResultado.length >= minResultados) break;
-          if (result.data.length < pageSize) break;
-        } catch (err: any) {
-          logger.error(`Consulta API mod=${mod} page ${page} error: ${err.message}`);
-          break;
+      totalAnalisadas += result.items.length;
+
+      for (const item of items) {
+        if (item.tem_resultado) {
+          comResultado.push(item);
         }
       }
+
+      logger.info(
+        `  Pagina ${page}: ${result.items.length} itens, ${items.length} do ${uf}, ${comResultado.length} com resultado`
+      );
+
+      if (comResultado.length >= minResultados) break;
+      if (result.items.length < pageSize) break;
     }
   } else {
     // No UF: use Search API (broader, but no native UF filter)

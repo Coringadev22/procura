@@ -24,14 +24,12 @@ export async function searchContratacoesByDate(
   const url = new URL(`${BASE_URL}/contratacoes/publicacao`);
   url.searchParams.set("dataInicial", params.dataInicial);
   url.searchParams.set("dataFinal", params.dataFinal);
-  if (params.codigoModalidade !== undefined) {
-    url.searchParams.set(
-      "codigoModalidadeContratacao",
-      String(params.codigoModalidade)
-    );
-  }
+  url.searchParams.set(
+    "codigoModalidadeContratacao",
+    String(params.codigoModalidade ?? 6)
+  );
   url.searchParams.set("pagina", String(params.pagina ?? 1));
-  url.searchParams.set("tamanhoPagina", String(Math.max(params.tamanhoPagina ?? 20, 10)));
+  url.searchParams.set("tamanhoPagina", String(params.tamanhoPagina ?? 20));
 
   if (params.uf) {
     url.searchParams.set("uf", params.uf.toUpperCase());
