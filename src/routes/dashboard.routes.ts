@@ -626,7 +626,7 @@ const HTML = `<!DOCTYPE html>
                 <span>Preview</span>
                 <span style="font-size:10px;color:#475569;text-transform:none;font-weight:400">Atualiza em tempo real</span>
               </div>
-              <iframe id="tpl-preview-iframe" class="tpl-preview-frame" sandbox="allow-same-origin"></iframe>
+              <iframe id="tpl-preview-iframe" class="tpl-preview-frame" sandbox="allow-same-origin allow-scripts"></iframe>
             </div>
           </div>
 
@@ -1847,7 +1847,7 @@ async function quickPreviewTemplate(id) {
     const body = document.getElementById('lic-modal-body');
     body.innerHTML = '<h3 style="color:#f8fafc;margin-bottom:8px">' + (data.templateName || 'Template') + '</h3>' +
       '<div style="font-size:12px;color:#64748b;margin-bottom:12px">Assunto: <strong style="color:#e2e8f0">' + (data.subject || '') + '</strong></div>' +
-      '<iframe id="quick-preview-frame" style="width:100%;height:500px;border:1px solid #334155;border-radius:8px;background:#fff" sandbox="allow-same-origin"></iframe>';
+      '<iframe id="quick-preview-frame" style="width:100%;height:500px;border:1px solid #334155;border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>';
     modal.classList.add('show');
     setTimeout(() => {
       const f = document.getElementById('quick-preview-frame');
