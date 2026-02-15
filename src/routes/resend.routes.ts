@@ -1,87 +1,30 @@
 import type { FastifyInstance } from "fastify";
 import { eq, desc } from "drizzle-orm";
 import { db } from "../config/database.js";
-import { gmailAccounts, emailTemplates, emailSendLog } from "../db/schema.js";
-import { env } from "../config/env.js";
+import { emailTemplates, emailSendLog, inboundEmails, leads } from "../db/schema.js";
 import {
-  getAuthUrl,
-  handleCallback,
+  isConfigured,
+  getStatus,
   sendEmail,
-} from "../services/gmail.service.js";
+  renderTemplate,
+} from "../services/resend.service.js";
 
-export async function gmailRoutes(app: FastifyInstance) {
-  // Check if Gmail is configured
-  app.get("/api/gmail/status", async () => {
-    const configured = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
-    const accounts = configured
-      ? await db
-          .select({
-            id: gmailAccounts.id,
-            email: gmailAccounts.email,
-            displayName: gmailAccounts.displayName,
-            isActive: gmailAccounts.isActive,
-            dailySentCount: gmailAccounts.dailySentCount,
-          })
-          .from(gmailAccounts)
-      : [];
-    return { configured, accounts };
+export async function resendRoutes(app: FastifyInstance) {
+  // ============ STATUS ============
+
+  app.get("/api/email/status", async () => {
+    if (!isConfigured()) {
+      return { configured: false, provider: "resend" };
+    }
+    return await getStatus();
   });
-
-  // Start OAuth flow
-  app.get("/api/gmail/auth", async (request, reply) => {
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      return reply.status(400).send({ error: "Google OAuth nao configurado" });
-    }
-    const url = getAuthUrl();
-    return reply.redirect(url);
-  });
-
-  // OAuth callback
-  app.get<{ Querystring: { code?: string; error?: string } }>(
-    "/api/gmail/callback",
-    async (request, reply) => {
-      if (request.query.error) {
-        return reply.redirect(
-          "/?gmail=error&msg=" + encodeURIComponent(request.query.error)
-        );
-      }
-      const code = request.query.code;
-      if (!code) {
-        return reply.redirect("/?gmail=error&msg=no_code");
-      }
-      try {
-        const result = await handleCallback(code);
-        return reply.redirect(
-          "/?gmail=success&email=" + encodeURIComponent(result.email)
-        );
-      } catch (err: any) {
-        return reply.redirect(
-          "/?gmail=error&msg=" + encodeURIComponent(err.message)
-        );
-      }
-    }
-  );
-
-  // Disconnect Gmail account
-  app.delete<{ Params: { id: string } }>(
-    "/api/gmail/accounts/:id",
-    async (request) => {
-      const id = Number(request.params.id);
-      await db.update(gmailAccounts)
-        .set({ isActive: false, updatedAt: new Date().toISOString() })
-        .where(eq(gmailAccounts.id, id));
-      return { success: true };
-    }
-  );
 
   // ============ TEMPLATES ============
 
-  // List templates
-  app.get("/api/gmail/templates", async () => {
+  app.get("/api/email/templates", async () => {
     return await db.select().from(emailTemplates);
   });
 
-  // Create template
   app.post<{
     Body: {
       name: string;
@@ -89,7 +32,7 @@ export async function gmailRoutes(app: FastifyInstance) {
       body: string;
       targetCategory?: string;
     };
-  }>("/api/gmail/templates", async (request) => {
+  }>("/api/email/templates", async (request) => {
     const { name, subject, body, targetCategory } = request.body;
     const [result] = await db
       .insert(emailTemplates)
@@ -103,7 +46,6 @@ export async function gmailRoutes(app: FastifyInstance) {
     return { id: result.id, success: true };
   });
 
-  // Update template
   app.put<{
     Params: { id: string };
     Body: {
@@ -112,24 +54,27 @@ export async function gmailRoutes(app: FastifyInstance) {
       body?: string;
       targetCategory?: string;
     };
-  }>("/api/gmail/templates/:id", async (request) => {
+  }>("/api/email/templates/:id", async (request) => {
     const id = Number(request.params.id);
     const { name, subject, body, targetCategory } = request.body;
-    const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
+    const updates: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
     if (name !== undefined) updates.name = name;
     if (subject !== undefined) updates.subject = subject;
     if (body !== undefined) updates.body = body;
-    if (targetCategory !== undefined) updates.targetCategory = targetCategory || null;
+    if (targetCategory !== undefined)
+      updates.targetCategory = targetCategory || null;
 
-    await db.update(emailTemplates)
+    await db
+      .update(emailTemplates)
       .set(updates)
       .where(eq(emailTemplates.id, id));
     return { success: true };
   });
 
-  // Delete template
   app.delete<{ Params: { id: string } }>(
-    "/api/gmail/templates/:id",
+    "/api/email/templates/:id",
     async (request) => {
       const id = Number(request.params.id);
       await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
@@ -139,10 +84,8 @@ export async function gmailRoutes(app: FastifyInstance) {
 
   // ============ SEND EMAILS ============
 
-  // Send to multiple leads
   app.post<{
     Body: {
-      accountId: number;
       templateId: number;
       leads: Array<{
         email: string;
@@ -154,8 +97,8 @@ export async function gmailRoutes(app: FastifyInstance) {
         uf?: string;
       }>;
     };
-  }>("/api/gmail/send", async (request) => {
-    const { accountId, templateId, leads } = request.body;
+  }>("/api/email/send", async (request) => {
+    const { templateId, leads: sendLeads } = request.body;
 
     const results: Array<{
       email: string;
@@ -165,8 +108,8 @@ export async function gmailRoutes(app: FastifyInstance) {
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < leads.length; i++) {
-      const lead = leads[i];
+    for (let i = 0; i < sendLeads.length; i++) {
+      const lead = sendLeads[i];
       const vars: Record<string, string> = {
         empresa: lead.empresa ?? "",
         cnpj: lead.cnpj ?? "",
@@ -178,7 +121,6 @@ export async function gmailRoutes(app: FastifyInstance) {
       };
 
       const result = await sendEmail(
-        accountId,
         templateId,
         lead.email,
         lead.cnpj ?? null,
@@ -189,19 +131,18 @@ export async function gmailRoutes(app: FastifyInstance) {
       if (result.success) successCount++;
       else failCount++;
 
-      // 1 second delay between sends
-      if (i < leads.length - 1) {
+      if (i < sendLeads.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
-    return { results, successCount, failCount, total: leads.length };
+    return { results, successCount, failCount, total: sendLeads.length };
   });
 
   // Send history
   app.get<{
     Querystring: { pagina?: string; tamanhoPagina?: string };
-  }>("/api/gmail/send-log", async (request) => {
+  }>("/api/email/send-log", async (request) => {
     const page = Number(request.query.pagina ?? 1);
     const pageSize = Number(request.query.tamanhoPagina ?? 50);
     const offset = (page - 1) * pageSize;
@@ -218,15 +159,13 @@ export async function gmailRoutes(app: FastifyInstance) {
 
   // ============ TEST EMAIL ============
 
-  // Send test email
   app.post<{
     Body: {
-      accountId: number;
       templateId: number;
       testEmail: string;
     };
-  }>("/api/gmail/send-test", async (request) => {
-    const { accountId, templateId, testEmail } = request.body;
+  }>("/api/email/send-test", async (request) => {
+    const { templateId, testEmail } = request.body;
 
     const testVars: Record<string, string> = {
       empresa: "Empresa Teste LTDA",
@@ -239,7 +178,6 @@ export async function gmailRoutes(app: FastifyInstance) {
     };
 
     const result = await sendEmail(
-      accountId,
       templateId,
       testEmail,
       "12345678000190",
@@ -252,7 +190,7 @@ export async function gmailRoutes(app: FastifyInstance) {
   // Preview template (no send)
   app.post<{
     Body: { templateId: number };
-  }>("/api/gmail/preview-template", async (request) => {
+  }>("/api/email/preview-template", async (request) => {
     const { templateId } = request.body;
 
     const [template] = await db
@@ -271,7 +209,6 @@ export async function gmailRoutes(app: FastifyInstance) {
       uf: "SP",
     };
 
-    const { renderTemplate } = await import("../services/gmail.service.js");
     const renderedSubject = renderTemplate(template.subject, vars);
     const renderedBody = renderTemplate(template.body, vars);
 
@@ -281,4 +218,97 @@ export async function gmailRoutes(app: FastifyInstance) {
       templateName: template.name,
     };
   });
+
+  // ============ WEBHOOKS ============
+
+  // Resend delivery events webhook
+  app.post<{
+    Body: {
+      type: string;
+      data: { email_id?: string };
+    };
+  }>("/api/email/webhook", async (request) => {
+    const event = request.body;
+    const messageId = event.data?.email_id;
+    if (!messageId) return { ok: true };
+
+    const statusMap: Record<string, string> = {
+      "email.delivered": "delivered",
+      "email.bounced": "bounced",
+      "email.complained": "complained",
+      "email.delivery_delayed": "delayed",
+    };
+
+    const deliveryStatus = statusMap[event.type];
+    if (deliveryStatus) {
+      await db
+        .update(emailSendLog)
+        .set({ deliveryStatus })
+        .where(eq(emailSendLog.resendMessageId, messageId));
+    }
+
+    return { ok: true };
+  });
+
+  // Resend inbound email webhook
+  app.post<{
+    Body: {
+      from: string;
+      to: string;
+      subject?: string;
+      text?: string;
+      html?: string;
+      headers?: Record<string, string>;
+    };
+  }>("/api/email/inbound", async (request) => {
+    const event = request.body;
+
+    // Try to match sender to a lead by email
+    let leadCnpj: string | null = null;
+    if (event.from) {
+      const fromAddr = event.from
+        .replace(/<|>/g, "")
+        .trim()
+        .toLowerCase();
+      const [matchedLead] = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.email, fromAddr));
+      if (matchedLead) leadCnpj = matchedLead.cnpj;
+    }
+
+    await db.insert(inboundEmails).values({
+      fromEmail: event.from || "unknown",
+      fromName: null,
+      toEmail: event.to || "",
+      subject: event.subject || null,
+      bodyText: event.text || null,
+      bodyHtml: event.html || null,
+      leadCnpj,
+    });
+
+    return { ok: true };
+  });
+
+  // ============ INBOX ============
+
+  app.get("/api/email/inbox", async () => {
+    return await db
+      .select()
+      .from(inboundEmails)
+      .orderBy(desc(inboundEmails.receivedAt))
+      .limit(100);
+  });
+
+  app.patch<{ Params: { id: string } }>(
+    "/api/email/inbox/:id/read",
+    async (request) => {
+      const id = Number(request.params.id);
+      await db
+        .update(inboundEmails)
+        .set({ isRead: true })
+        .where(eq(inboundEmails.id, id));
+      return { success: true };
+    }
+  );
 }

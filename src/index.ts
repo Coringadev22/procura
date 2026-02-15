@@ -9,7 +9,7 @@ import { contratosRoutes } from "./routes/contratos.routes.js";
 import { fornecedoresRoutes } from "./routes/fornecedores.routes.js";
 import { dashboardRoutes } from "./routes/dashboard.routes.js";
 import { buscaEmailsRoutes } from "./routes/busca-emails.routes.js";
-import { gmailRoutes } from "./routes/gmail.routes.js";
+import { resendRoutes } from "./routes/resend.routes.js";
 import { automationRoutes } from "./routes/automation.routes.js";
 import { leadsRoutes } from "./routes/leads.routes.js";
 import { startAutomationScheduler, cancelAllJobs } from "./services/automation.service.js";
@@ -32,7 +32,7 @@ await app.register(licitacoesRoutes);
 await app.register(contratosRoutes);
 await app.register(fornecedoresRoutes);
 await app.register(buscaEmailsRoutes);
-await app.register(gmailRoutes);
+await app.register(resendRoutes);
 await app.register(automationRoutes);
 await app.register(leadsRoutes);
 await app.register(dashboardRoutes);
@@ -63,7 +63,7 @@ try {
   logger.info("  GET /api/fornecedores/:cnpj");
   logger.info("  GET /api/fornecedores/search?uf=&municipio=&hasEmail=");
   logger.info("  GET/POST/PUT/DELETE /api/automation/jobs");
-  logger.info("  POST /api/gmail/send-test | /api/gmail/preview-template");
+  logger.info("  POST /api/email/send-test | /api/email/preview-template");
 } catch (err) {
   logger.error(err);
   process.exit(1);

@@ -7,7 +7,7 @@ import {
   fornecedores,
   leads,
 } from "../db/schema.js";
-import { sendEmail } from "./gmail.service.js";
+import { sendEmail } from "./resend.service.js";
 import { runEmailSearch } from "./email-search.service.js";
 import { classifyLead } from "../utils/email-category.js";
 import { getSource } from "./data-sources/index.js";
@@ -419,7 +419,7 @@ export async function executeJob(jobId: number): Promise<void> {
       recipients = recipients.slice(0, job.maxEmailsPerRun);
 
       // 5. Send emails
-      if (recipients.length > 0 && job.gmailAccountId && job.templateId) {
+      if (recipients.length > 0 && job.templateId) {
         for (let i = 0; i < recipients.length; i++) {
           const r = recipients[i];
           const vars: Record<string, string> = {
@@ -433,7 +433,6 @@ export async function executeJob(jobId: number): Promise<void> {
           };
 
           const result = await sendEmail(
-            job.gmailAccountId,
             job.templateId,
             r.email,
             r.cnpj,

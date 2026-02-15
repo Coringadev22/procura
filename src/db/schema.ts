@@ -86,7 +86,7 @@ export const contratos = pgTable("contratos", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-// Gmail OAuth accounts
+// Gmail OAuth accounts (legacy - kept for FK references)
 export const gmailAccounts = pgTable("gmail_accounts", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
@@ -124,9 +124,7 @@ export const emailTemplates = pgTable("email_templates", {
 // Email send log
 export const emailSendLog = pgTable("email_send_log", {
   id: serial("id").primaryKey(),
-  gmailAccountId: integer("gmail_account_id")
-    .notNull()
-    .references(() => gmailAccounts.id),
+  gmailAccountId: integer("gmail_account_id"),
   templateId: integer("template_id").references(() => emailTemplates.id),
   recipientEmail: text("recipient_email").notNull(),
   recipientCnpj: text("recipient_cnpj"),
@@ -134,6 +132,8 @@ export const emailSendLog = pgTable("email_send_log", {
   subject: text("subject").notNull(),
   status: text("status").notNull(),
   errorMessage: text("error_message"),
+  resendMessageId: text("resend_message_id"),
+  deliveryStatus: text("delivery_status"),
   sentAt: text("sent_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -191,7 +191,25 @@ export const leads = pgTable("leads", {
   fonte: text("fonte"),
   valorHomologado: real("valor_homologado"),
   categoria: text("categoria").notNull().default("empresa"),
+  emailSentAt: text("email_sent_at"),
+  emailSentCount: integer("email_sent_count").notNull().default(0),
   createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+// Inbound emails (received via Resend webhooks)
+export const inboundEmails = pgTable("inbound_emails", {
+  id: serial("id").primaryKey(),
+  fromEmail: text("from_email").notNull(),
+  fromName: text("from_name"),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject"),
+  bodyText: text("body_text"),
+  bodyHtml: text("body_html"),
+  leadCnpj: text("lead_cnpj"),
+  isRead: boolean("is_read").notNull().default(false),
+  receivedAt: text("received_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
 });

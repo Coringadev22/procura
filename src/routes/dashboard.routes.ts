@@ -185,7 +185,7 @@ const HTML = `<!DOCTYPE html>
         <button class="nav-item" data-tab="cnpj" data-active-class="active" onclick="switchTab('cnpj')"><span class="nav-icon">&#128270;</span> Consulta CNPJ</button>
 
         <div class="sidebar-section">Comunicacao</div>
-        <button class="nav-item" data-tab="gmail" data-active-class="active-purple" onclick="switchTab('gmail')"><span class="nav-icon">&#9993;</span> Gmail / Email</button>
+        <button class="nav-item" data-tab="email" data-active-class="active-purple" onclick="switchTab('email')"><span class="nav-icon">&#9993;</span> Email</button>
         <button class="nav-item" data-tab="automacao" data-active-class="active-amber" onclick="switchTab('automacao')"><span class="nav-icon">&#9889;</span> Automacao</button>
       </nav>
       <div class="sidebar-footer">v3.1 — Dados do PNCP</div>
@@ -398,31 +398,25 @@ const HTML = `<!DOCTYPE html>
       <div id="cnpj-loading" class="loading"><div class="spinner"></div><div class="loading-text">Consultando CNPJ na Receita Federal...</div></div>
       <div id="cnpj-results"></div>
     </div>
-    <!-- ============ GMAIL / EMAIL ============ -->
-    <div class="panel" id="panel-gmail">
-      <div class="info-box" id="gmail-status-box">
-        <strong>Gmail:</strong> Conecte sua conta Google para enviar emails diretamente da plataforma. Crie templates com variaveis como {empresa}, {cnpj}, {valor} e envie em lote para seus leads filtrados por categoria.
+    <!-- ============ EMAIL (RESEND) ============ -->
+    <div class="panel" id="panel-email">
+      <div class="info-box" id="email-status-box">
+        <strong>Email:</strong> Envie emails diretamente da plataforma via Resend. Crie templates com variaveis como {empresa}, {cnpj}, {valor} e envie em lote para seus leads filtrados por categoria.
       </div>
 
-      <div id="gmail-connect-section" class="search-box" style="display:none">
-        <h2>Conectar Gmail</h2>
-        <div class="desc">Clique no botao abaixo para autorizar o acesso ao Gmail via Google OAuth. Voce precisara configurar GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no arquivo .env antes.</div>
-        <a href="/api/gmail/auth" class="btn btn-primary">Conectar Conta Gmail</a>
-      </div>
-
-      <div id="gmail-not-configured" class="info-box warn" style="display:none">
-        <strong>Gmail nao configurado.</strong> Adicione GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET ao arquivo .env para habilitar o envio de emails. Veja as instrucoes no README.
-      </div>
-
-      <div id="gmail-account-section" class="card" style="display:none">
+      <div id="email-config-section" class="card" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
           <div>
-            <h4 id="gmail-account-name" style="color:#22c55e"></h4>
-            <div id="gmail-account-email" style="color:#64748b;font-size:13px"></div>
-            <div id="gmail-account-quota" style="color:#94a3b8;font-size:12px;margin-top:4px"></div>
+            <h4 style="color:#22c55e">Resend Configurado</h4>
+            <div id="email-from" style="color:#64748b;font-size:13px"></div>
+            <div id="email-quota" style="color:#94a3b8;font-size:12px;margin-top:4px"></div>
           </div>
-          <button class="btn btn-red btn-sm" id="gmail-disconnect-btn">Desconectar</button>
+          <span class="badge badge-green">Ativo</span>
         </div>
+      </div>
+
+      <div id="email-not-configured" class="info-box warn" style="display:none">
+        <strong>Email nao configurado.</strong> Adicione RESEND_API_KEY nas variaveis de ambiente para habilitar o envio de emails.
       </div>
 
       <div class="search-box" style="margin-top:20px">
@@ -431,7 +425,7 @@ const HTML = `<!DOCTYPE html>
           <button class="btn btn-green btn-sm" onclick="showTemplateForm()">Novo Template</button>
         </div>
 
-        <div id="gmail-template-form" style="display:none;margin-bottom:16px;padding:16px;background:#0f172a;border-radius:10px;border:1px solid #334155">
+        <div id="email-template-form" style="display:none;margin-bottom:16px;padding:16px;background:#0f172a;border-radius:10px;border:1px solid #334155">
           <input type="hidden" id="tpl-edit-id" value="">
           <div class="form-row">
             <div class="form-group" style="flex:2"><label>Nome do Template</label><input type="text" id="tpl-name" placeholder="Ex: Proposta para empresas"></div>
@@ -445,20 +439,20 @@ const HTML = `<!DOCTYPE html>
           </div>
         </div>
 
-        <div id="gmail-templates-list"></div>
+        <div id="email-templates-list"></div>
       </div>
 
-      <div class="search-box" style="margin-top:20px" id="gmail-send-section">
+      <div class="search-box" style="margin-top:20px" id="email-send-section">
         <h2>Enviar Emails</h2>
-        <div class="desc">Selecione um template e filtre os leads por categoria. O sistema envia 1 email por segundo (limite Gmail: 450/dia).</div>
+        <div class="desc">Selecione um template e filtre os leads por categoria. O sistema envia 1 email por segundo.</div>
         <div class="form-row">
           <div class="form-group">
             <label>Template</label>
-            <select id="gmail-send-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"></select>
+            <select id="email-send-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"></select>
           </div>
           <div class="form-group">
             <label>Filtro de Leads</label>
-            <select id="gmail-send-filter" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px">
+            <select id="email-send-filter" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px">
               <option value="todos">Todos com email</option>
               <option value="empresa">Apenas Empresas</option>
               <option value="contabilidade">Apenas Contabilidades</option>
@@ -466,14 +460,22 @@ const HTML = `<!DOCTYPE html>
           </div>
           <div class="form-group" style="flex:0">
             <label>&nbsp;</label>
-            <button class="btn btn-green" id="gmail-send-btn" onclick="sendGmailEmails()">Enviar</button>
+            <button class="btn btn-green" id="email-send-btn" onclick="sendEmails()">Enviar</button>
           </div>
         </div>
-        <div id="gmail-send-preview" style="margin-top:12px;font-size:12px;color:#94a3b8"></div>
-        <div id="gmail-send-results" style="margin-top:12px"></div>
+        <div id="email-send-preview" style="margin-top:12px;font-size:12px;color:#94a3b8"></div>
+        <div id="email-send-results" style="margin-top:12px"></div>
       </div>
 
-      <div style="margin-top:20px" id="gmail-history"></div>
+      <div class="search-box" style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Caixa de Entrada</h2>
+          <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="loadInbox()">Atualizar</button>
+        </div>
+        <div id="email-inbox-list"><div style="color:#64748b;font-size:13px;padding:8px">Carregando...</div></div>
+      </div>
+
+      <div style="margin-top:20px" id="email-history"></div>
     </div>
 
     <!-- ============ AUTOMACAO ============ -->
@@ -531,7 +533,6 @@ const HTML = `<!DOCTYPE html>
             <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
           </div>
           <div id="auto-email-fields" class="form-row" style="margin-top:12px;display:none">
-            <div class="form-group"><label>Conta Gmail</label><select id="auto-gmail" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
             <div class="form-group"><label>Template</label><select id="auto-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
           </div>
           <div class="form-row" style="margin-top:12px">
@@ -757,11 +758,16 @@ function renderLeads() {
   const empresas = leads.filter(l => l.categoria === 'empresa').length;
   const contabs = leads.filter(l => l.categoria === 'contabilidade').length;
 
+  const emailsSentTotal = leads.reduce(function(s,l){ return s + (Number(l.emailSentCount) || 0); }, 0);
+  const leadsEmailed = leads.filter(function(l){ return (Number(l.emailSentCount) || 0) > 0; }).length;
+
   statsEl.innerHTML =
     '<div class="stat"><div class="stat-value blue">' + leads.length + '</div><div class="stat-label">Total de leads</div></div>' +
     '<div class="stat"><div class="stat-value green">' + comEmail + '</div><div class="stat-label">Com email</div></div>' +
     '<div class="stat"><div class="stat-value" style="color:#22c55e">' + empresas + '</div><div class="stat-label">Empresas</div></div>' +
-    '<div class="stat"><div class="stat-value" style="color:#f97316">' + contabs + '</div><div class="stat-label">Contabilidades</div></div>';
+    '<div class="stat"><div class="stat-value" style="color:#f97316">' + contabs + '</div><div class="stat-label">Contabilidades</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#8b5cf6">' + emailsSentTotal + '</div><div class="stat-label">Emails enviados</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#8b5cf6">' + leadsEmailed + '</div><div class="stat-label">Leads contatados</div></div>';
 
   actionsEl.style.display = leads.length > 0 ? 'flex' : 'none';
 
@@ -788,6 +794,8 @@ function renderLeads() {
     else if (sc === 'cnae') { va = (a.cnaePrincipal || '').toLowerCase(); vb = (b.cnaePrincipal || '').toLowerCase(); }
     else if (sc === 'cidade') { va = ((a.municipio || '') + (a.uf || '')).toLowerCase(); vb = ((b.municipio || '') + (b.uf || '')).toLowerCase(); }
     else if (sc === 'fonte') { va = (a.fonte || a.origem || '').toLowerCase(); vb = (b.fonte || b.origem || '').toLowerCase(); }
+    else if (sc === 'telefone') { va = (a.telefones || '').toLowerCase(); vb = (b.telefones || '').toLowerCase(); }
+    else if (sc === 'enviado') { va = Number(a.emailSentCount) || 0; vb = Number(b.emailSentCount) || 0; return (va - vb) * sd; }
     else { va = (a.razaoSocial || '').toLowerCase(); vb = (b.razaoSocial || '').toLowerCase(); }
     if (va < vb) return -1 * sd;
     if (va > vb) return 1 * sd;
@@ -814,8 +822,10 @@ function renderLeads() {
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'categoria\\')">Categoria' + sortIcon('categoria') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'cnae\\')">Atividade (CNAE)' + sortIcon('cnae') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'cidade\\')">Cidade/UF' + sortIcon('cidade') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'telefone\\')">Telefone' + sortIcon('telefone') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'fonte\\')">Fonte' + sortIcon('fonte') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'valor\\')">Valor' + sortIcon('valor') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'enviado\\')">Enviado' + sortIcon('enviado') + '</th>' +
     '<th></th>' +
     '</tr></thead><tbody>';
 
@@ -827,8 +837,10 @@ function renderLeads() {
       '<td><button class="badge-cat badge ' + catBadge(l.categoria) + '" onclick="toggleCategoria(\\''+l.cnpj+'\\');event.stopPropagation()" title="Clique para alterar">' + catLabel(l.categoria) + '</button></td>' +
       '<td style="font-size:11px;color:#94a3b8;max-width:180px" title="' + (l.cnaePrincipal||'').replace(/"/g,'') + '">' + cnaeShort + '</td>' +
       '<td style="font-size:12px">' + (l.municipio || '') + (l.uf ? '/' + l.uf : '') + '</td>' +
+      '<td style="font-size:12px;color:#94a3b8">' + (l.telefones || '-') + '</td>' +
       '<td><span class="badge ' + fonteBadge(l.fonte || l.origem) + '">' + fonteLabel(l.fonte || l.origem || '-') + '</span></td>' +
       '<td style="font-size:12px;color:#22c55e;font-weight:600">' + money(l.valorHomologado) + '</td>' +
+      '<td>' + ((Number(l.emailSentCount)||0) > 0 ? '<span class="badge badge-green">' + l.emailSentCount + 'x</span>' : '<span class="badge badge-gray">N/A</span>') + '</td>' +
       '<td><button class="btn btn-xs btn-red" onclick="removeLead(\\''+l.cnpj+'\\')">X</button></td>' +
       '</tr>';
   });
@@ -873,9 +885,9 @@ function copyLeadEmails() {
 function exportLeadsCSV() {
   const source = getFilteredLeads();
   if (source.length === 0) return showToast('Nenhum lead para exportar', true);
-  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Fonte,Categoria,Valor Homologado';
+  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Fonte,Categoria,Valor Homologado,Emails Enviados';
   const rows = source.map(l => {
-    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.fonte||l.origem||'', l.categoria||'', l.valorHomologado||''].join(',');
+    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.fonte||l.origem||'', l.categoria||'', l.valorHomologado||'', l.emailSentCount||0].join(',');
   });
   const csv = header + '\\n' + rows.join('\\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -958,7 +970,7 @@ function switchTab(tabName) {
   // Lazy-load hooks
   if (tabName === 'leads') renderLeads();
   if (tabName === 'licitacoes' && !licLoaded) { licLoaded = true; licPage = 1; searchLicitacoes(); }
-  if (tabName === 'gmail' && !gmailLoaded) { gmailLoaded = true; loadGmailStatus(); }
+  if (tabName === 'email' && !emailLoaded) { emailLoaded = true; loadEmailStatus(); }
   if (tabName === 'automacao' && !autoLoaded) { autoLoaded = true; loadAutomacao(); }
 }
 
@@ -1419,10 +1431,10 @@ async function lookupCnpj() {
   }
 }
 
-// ============ GMAIL ============
-let gmailAccount = null;
-let gmailTemplates = [];
-let gmailLoaded = false;
+// ============ EMAIL (RESEND) ============
+let emailConfigured = false;
+let emailTemplates = [];
+let emailLoaded = false;
 
 async function apiPost(url, body) {
   const res = await fetch(API + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -1440,58 +1452,41 @@ async function apiDelete(url) {
   return res.json();
 }
 
-async function loadGmailStatus() {
+async function loadEmailStatus() {
   try {
-    const data = await apiFetch('/api/gmail/status');
+    const data = await apiFetch('/api/email/status');
+    emailConfigured = data.configured;
     if (!data.configured) {
-      document.getElementById('gmail-not-configured').style.display = 'block';
-      document.getElementById('gmail-connect-section').style.display = 'none';
-      document.getElementById('gmail-account-section').style.display = 'none';
+      document.getElementById('email-not-configured').style.display = 'block';
+      document.getElementById('email-config-section').style.display = 'none';
       return;
     }
-    document.getElementById('gmail-not-configured').style.display = 'none';
-    const active = data.accounts.find(a => a.isActive);
-    if (active) {
-      gmailAccount = active;
-      document.getElementById('gmail-connect-section').style.display = 'none';
-      document.getElementById('gmail-account-section').style.display = 'block';
-      document.getElementById('gmail-account-name').textContent = active.displayName || active.email;
-      document.getElementById('gmail-account-email').textContent = active.email;
-      document.getElementById('gmail-account-quota').textContent = (active.dailySentCount || 0) + ' / 450 emails enviados hoje';
-      document.getElementById('gmail-disconnect-btn').onclick = () => disconnectGmail(active.id);
-    } else {
-      document.getElementById('gmail-connect-section').style.display = 'block';
-      document.getElementById('gmail-account-section').style.display = 'none';
-    }
+    document.getElementById('email-not-configured').style.display = 'none';
+    document.getElementById('email-config-section').style.display = 'block';
+    document.getElementById('email-from').textContent = (data.fromName || 'Procura') + ' <' + (data.fromEmail || '') + '>';
+    document.getElementById('email-quota').textContent = (data.todaySent || 0) + ' emails enviados hoje | ' + (data.totalSent || 0) + ' total';
     await loadTemplates();
     updateSendPreview();
+    loadInbox();
   } catch(e) {
-    document.getElementById('gmail-status-box').innerHTML = '<strong>Erro:</strong> ' + e.message;
+    document.getElementById('email-status-box').innerHTML = '<strong>Erro:</strong> ' + e.message;
   }
 }
 
-async function disconnectGmail(id) {
-  if (!confirm('Desconectar conta Gmail?')) return;
-  await apiDelete('/api/gmail/accounts/' + id);
-  gmailAccount = null;
-  await loadGmailStatus();
-  showToast('Gmail desconectado');
-}
-
 async function loadTemplates() {
-  gmailTemplates = await apiFetch('/api/gmail/templates');
+  emailTemplates = await apiFetch('/api/email/templates');
   renderTemplatesList();
   updateSendTemplateSelect();
 }
 
 function renderTemplatesList() {
-  const el = document.getElementById('gmail-templates-list');
-  if (gmailTemplates.length === 0) {
+  const el = document.getElementById('email-templates-list');
+  if (emailTemplates.length === 0) {
     el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px">Nenhum template criado ainda.</div>';
     return;
   }
   let html = '';
-  gmailTemplates.forEach(t => {
+  emailTemplates.forEach(t => {
     const catText = t.targetCategory ? catLabel(t.targetCategory) : 'Todos';
     html += '<div class="card" style="margin-bottom:8px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
@@ -1508,27 +1503,28 @@ function renderTemplatesList() {
 }
 
 function updateSendTemplateSelect() {
-  const sel = document.getElementById('gmail-send-template');
+  const sel = document.getElementById('email-send-template');
+  if (!sel) return;
   sel.innerHTML = '<option value="">Selecione um template</option>' +
-    gmailTemplates.map(t => '<option value="' + t.id + '">' + t.name + (t.targetCategory ? ' (' + catLabel(t.targetCategory) + ')' : '') + '</option>').join('');
+    emailTemplates.map(t => '<option value="' + t.id + '">' + t.name + (t.targetCategory ? ' (' + catLabel(t.targetCategory) + ')' : '') + '</option>').join('');
 }
 
 function updateSendPreview() {
-  const filter = document.getElementById('gmail-send-filter')?.value || 'todos';
+  const filter = document.getElementById('email-send-filter')?.value || 'todos';
   const eligible = leads.filter(l => {
     if (!l.email) return false;
     if (filter === 'todos') return true;
     return l.categoria === filter;
   });
-  const el = document.getElementById('gmail-send-preview');
+  const el = document.getElementById('email-send-preview');
   if (el) el.textContent = eligible.length + ' leads com email serao enviados';
 }
 
 function showTemplateForm(id) {
-  document.getElementById('gmail-template-form').style.display = 'block';
+  document.getElementById('email-template-form').style.display = 'block';
   document.getElementById('tpl-edit-id').value = id || '';
   if (id) {
-    const t = gmailTemplates.find(x => x.id === id);
+    const t = emailTemplates.find(x => x.id === id);
     if (t) {
       document.getElementById('tpl-name').value = t.name;
       document.getElementById('tpl-subject').value = t.subject;
@@ -1544,7 +1540,7 @@ function showTemplateForm(id) {
 }
 
 function hideTemplateForm() {
-  document.getElementById('gmail-template-form').style.display = 'none';
+  document.getElementById('email-template-form').style.display = 'none';
 }
 
 async function saveTemplate() {
@@ -1556,10 +1552,10 @@ async function saveTemplate() {
   if (!name || !subject || !body) return showToast('Preencha nome, assunto e corpo', true);
   try {
     if (id) {
-      await apiPut('/api/gmail/templates/' + id, { name, subject, body, targetCategory });
+      await apiPut('/api/email/templates/' + id, { name, subject, body, targetCategory });
       showToast('Template atualizado!');
     } else {
-      await apiPost('/api/gmail/templates', { name, subject, body, targetCategory });
+      await apiPost('/api/email/templates', { name, subject, body, targetCategory });
       showToast('Template criado!');
     }
     hideTemplateForm();
@@ -1571,16 +1567,16 @@ function editTemplate(id) { showTemplateForm(id); }
 
 async function deleteTemplate(id) {
   if (!confirm('Excluir este template?')) return;
-  await apiDelete('/api/gmail/templates/' + id);
+  await apiDelete('/api/email/templates/' + id);
   await loadTemplates();
   showToast('Template excluido');
 }
 
-async function sendGmailEmails() {
-  if (!gmailAccount) return showToast('Conecte uma conta Gmail primeiro', true);
-  const templateId = document.getElementById('gmail-send-template').value;
+async function sendEmails() {
+  if (!emailConfigured) return showToast('Configure o RESEND_API_KEY primeiro', true);
+  const templateId = document.getElementById('email-send-template').value;
   if (!templateId) return showToast('Selecione um template', true);
-  const filter = document.getElementById('gmail-send-filter').value;
+  const filter = document.getElementById('email-send-filter').value;
   const eligible = leads.filter(l => {
     if (!l.email) return false;
     if (filter === 'todos') return true;
@@ -1589,12 +1585,11 @@ async function sendGmailEmails() {
   if (eligible.length === 0) return showToast('Nenhum lead com email nesta categoria', true);
   if (!confirm('Enviar email para ' + eligible.length + ' leads?')) return;
 
-  const btn = document.getElementById('gmail-send-btn');
+  const btn = document.getElementById('email-send-btn');
   btn.disabled = true; btn.textContent = 'Enviando...';
 
   try {
     const payload = {
-      accountId: gmailAccount.id,
       templateId: Number(templateId),
       leads: eligible.map(l => ({
         email: l.email, cnpj: l.cnpj,
@@ -1604,10 +1599,11 @@ async function sendGmailEmails() {
         cidade: l.municipio || '', uf: l.uf || ''
       }))
     };
-    const data = await apiPost('/api/gmail/send', payload);
-    document.getElementById('gmail-send-results').innerHTML =
+    const data = await apiPost('/api/email/send', payload);
+    document.getElementById('email-send-results').innerHTML =
       '<div class="info-box success"><strong>' + data.successCount + '</strong> emails enviados, <strong>' + data.failCount + '</strong> falharam de <strong>' + data.total + '</strong> total</div>';
-    await loadGmailStatus();
+    await loadEmailStatus();
+    await loadLeads();
   } catch(e) {
     showToast('Erro ao enviar: ' + e.message, true);
   } finally {
@@ -1616,7 +1612,7 @@ async function sendGmailEmails() {
 }
 
 // Update preview when filter changes
-document.getElementById('gmail-send-filter')?.addEventListener('change', updateSendPreview);
+document.getElementById('email-send-filter')?.addEventListener('change', updateSendPreview);
 
 // ============ AUTOMACAO ============
 let autoLoaded = false;
@@ -1636,22 +1632,16 @@ async function loadAutomacao() {
       '<div class="stat"><div class="stat-value green">' + statusData.emailsToday + '</div><div class="stat-label">Emails hoje</div></div>' +
       '<div class="stat"><div class="stat-value">' + (statusData.nextRun ? timeSince(statusData.nextRun) : 'N/A') + '</div><div class="stat-label">Proxima execucao</div></div>';
     renderAutoJobs();
-    // Load gmail accounts and templates for form selects
-    if (!gmailLoaded) { gmailLoaded = true; await loadGmailStatus(); }
+    // Load email templates for form selects
+    if (!emailLoaded) { emailLoaded = true; await loadEmailStatus(); }
     updateAutoFormSelects();
   } catch(e) { showToast('Erro ao carregar automacao: ' + e.message, true); }
 }
 
 function updateAutoFormSelects() {
-  const gmailSel = document.getElementById('auto-gmail');
-  if (gmailAccount) {
-    gmailSel.innerHTML = '<option value="' + gmailAccount.id + '">' + gmailAccount.email + '</option>';
-  } else {
-    gmailSel.innerHTML = '<option value="">Nenhuma conta conectada</option>';
-  }
   const tplSel = document.getElementById('auto-template');
   tplSel.innerHTML = '<option value="">Selecione...</option>' +
-    gmailTemplates.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+    emailTemplates.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
 }
 
 function renderAutoJobs() {
@@ -1715,7 +1705,6 @@ function showAutoJobForm(id) {
       document.getElementById('auto-qty').value = j.searchQuantity;
       document.getElementById('auto-cnae').value = j.searchCnae || '';
       document.getElementById('auto-source').value = j.sourceType || 'pncp';
-      document.getElementById('auto-gmail').value = j.gmailAccountId || '';
       document.getElementById('auto-template').value = j.templateId || '';
       document.getElementById('auto-category').value = j.targetCategory || 'all';
       document.getElementById('auto-max').value = j.maxEmailsPerRun;
@@ -1747,10 +1736,8 @@ async function saveAutoJob(startAfter) {
   if (!name) return showToast('Informe um nome para o job', true);
   const jobType = document.getElementById('auto-job-type').value;
   const templateId = document.getElementById('auto-template').value;
-  const gmailAccountId = document.getElementById('auto-gmail').value;
   if (jobType === 'email_send') {
     if (!templateId) return showToast('Selecione um template', true);
-    if (!gmailAccountId) return showToast('Selecione uma conta Gmail', true);
   }
 
   const body = {
@@ -1762,7 +1749,6 @@ async function saveAutoJob(startAfter) {
     searchCnae: document.getElementById('auto-cnae').value || null,
     sourceType: document.getElementById('auto-source').value,
     templateId: templateId ? Number(templateId) : null,
-    gmailAccountId: gmailAccountId ? Number(gmailAccountId) : null,
     targetCategory: document.getElementById('auto-category').value || 'all',
     intervalHours: Number(document.getElementById('auto-interval').value),
     maxEmailsPerRun: Number(document.getElementById('auto-max').value) || 50
@@ -1870,7 +1856,7 @@ function showTestEmailModal() {
   modal.classList.add('show');
   const sel = document.getElementById('test-template');
   sel.innerHTML = '<option value="">Selecione...</option>' +
-    gmailTemplates.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+    emailTemplates.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
   document.getElementById('test-email-input').value = '';
   document.getElementById('test-preview').innerHTML = '';
   document.getElementById('test-result').innerHTML = '';
@@ -1884,7 +1870,7 @@ async function previewTestEmail() {
   const templateId = document.getElementById('test-template').value;
   if (!templateId) { document.getElementById('test-preview').innerHTML = ''; return; }
   try {
-    const data = await apiPost('/api/gmail/preview-template', { templateId: Number(templateId) });
+    const data = await apiPost('/api/email/preview-template', { templateId: Number(templateId) });
     document.getElementById('test-preview').innerHTML =
       '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-top:8px">' +
       '<div style="font-size:11px;color:#475569;margin-bottom:4px">ASSUNTO:</div>' +
@@ -1899,14 +1885,13 @@ async function sendTestEmail() {
   const testEmail = document.getElementById('test-email-input').value.trim();
   if (!templateId) return showToast('Selecione um template', true);
   if (!testEmail) return showToast('Informe um email de teste', true);
-  if (!gmailAccount) return showToast('Conecte uma conta Gmail primeiro', true);
+  if (!emailConfigured) return showToast('Configure o RESEND_API_KEY primeiro', true);
 
   const resEl = document.getElementById('test-result');
   resEl.innerHTML = '<div class="loading show" style="padding:8px"><div class="spinner"></div><div class="loading-text">Enviando...</div></div>';
 
   try {
-    const data = await apiPost('/api/gmail/send-test', {
-      accountId: gmailAccount.id,
+    const data = await apiPost('/api/email/send-test', {
       templateId: Number(templateId),
       testEmail: testEmail
     });
@@ -1930,15 +1915,38 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') { closeLicModal
 // Load leads from database on startup
 loadLeads();
 
-// Check for Gmail OAuth redirect
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('gmail') === 'success') {
-  showToast('Gmail conectado: ' + urlParams.get('email'));
-  history.replaceState({}, '', '/');
-  setTimeout(() => { switchTab('gmail'); gmailLoaded = true; loadGmailStatus(); }, 100);
-} else if (urlParams.get('gmail') === 'error') {
-  showToast('Erro Gmail: ' + urlParams.get('msg'), true);
-  history.replaceState({}, '', '/');
+// ============ INBOX ============
+async function loadInbox() {
+  const el = document.getElementById('email-inbox-list');
+  try {
+    const msgs = await apiFetch('/api/email/inbox');
+    if (!msgs.length) {
+      el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:8px">Nenhum email recebido ainda.</div>';
+      return;
+    }
+    let html = '<div class="table-wrap"><table><thead><tr><th>De</th><th>Assunto</th><th>Data</th><th>Lead</th><th></th></tr></thead><tbody>';
+    msgs.forEach(m => {
+      const isRead = m.isRead;
+      html += '<tr style="' + (isRead ? '' : 'background:#162032') + '">' +
+        '<td style="font-size:12px;font-weight:' + (isRead ? '400' : '600') + '">' + (m.fromName || m.fromEmail) + '<div style="color:#475569;font-size:11px">' + m.fromEmail + '</div></td>' +
+        '<td style="font-size:12px;font-weight:' + (isRead ? '400' : '600') + '">' + (m.subject || '(sem assunto)') + '</td>' +
+        '<td style="font-size:11px;white-space:nowrap;color:#64748b">' + new Date(m.receivedAt).toLocaleString('pt-BR') + '</td>' +
+        '<td>' + (m.leadCnpj ? '<span class="badge badge-green" style="font-size:10px">Lead</span>' : '') + '</td>' +
+        '<td style="display:flex;gap:4px">' +
+          (!isRead ? '<button class="btn btn-xs btn-primary" onclick="markInboxRead(' + m.id + ')">Lido</button>' : '<span class="badge badge-gray">Lido</span>') +
+        '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div style="color:#fca5a5;font-size:12px">Erro: ' + e.message + '</div>'; }
+}
+
+async function markInboxRead(id) {
+  try {
+    await fetch(API + '/api/email/inbox/' + id + '/read', { method: 'PATCH' });
+    loadInbox();
+  } catch(e) { showToast('Erro: ' + e.message, true); }
 }
 </script>
 </body>

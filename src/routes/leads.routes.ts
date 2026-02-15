@@ -34,7 +34,9 @@ export async function leadsRoutes(app: FastifyInstance) {
     const comEmail = all.filter((l) => l.email).length;
     const empresas = all.filter((l) => l.categoria === "empresa").length;
     const contabilidades = all.filter((l) => l.categoria === "contabilidade").length;
-    return { total, comEmail, empresas, contabilidades };
+    const emailsSent = all.reduce((sum, l) => sum + (l.emailSentCount ?? 0), 0);
+    const leadsEmailed = all.filter((l) => (l.emailSentCount ?? 0) > 0).length;
+    return { total, comEmail, empresas, contabilidades, emailsSent, leadsEmailed };
   });
 
   // Add single lead
