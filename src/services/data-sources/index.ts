@@ -2,7 +2,7 @@ import { PncpSource } from "./pncp.source.js";
 import { PncpContratosSource } from "./pncp-contratos.source.js";
 import { SicafSource } from "./sicaf.source.js";
 import { TceRjSource } from "./tce-rj.source.js";
-import { TransparenciaSource } from "./transparencia.source.js";
+// import { TransparenciaSource } from "./transparencia.source.js"; // Requer PORTAL_TRANSPARENCIA_KEY
 import type { DataSource } from "./types.js";
 
 const sources: DataSource[] = [
@@ -10,7 +10,7 @@ const sources: DataSource[] = [
   new PncpContratosSource(),
   new SicafSource(),
   new TceRjSource(),
-  new TransparenciaSource(),
+  // new TransparenciaSource(), // Descomentar quando tiver a API key
 ];
 
 const sourceMap = new Map(sources.map((s) => [s.name, s]));
