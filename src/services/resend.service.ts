@@ -69,7 +69,7 @@ export async function sendEmail(
       html: body,
     };
     if (env.RESEND_REPLY_TO) {
-      sendPayload.reply_to = env.RESEND_REPLY_TO;
+      sendPayload.replyTo = env.RESEND_REPLY_TO;
     }
 
     const { data, error } = await client.emails.send(sendPayload);
