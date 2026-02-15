@@ -23,7 +23,7 @@ export class SicafSource implements DataSource {
     if (!config.uf) throw new Error("SICAF requer filtro de UF");
 
     const limit = config.quantity || 50;
-    const url = `http://compras.dados.gov.br/fornecedores/v1/fornecedores.json?uf=${config.uf.toUpperCase()}&offset=0&limit=${limit}`;
+    const url = `https://compras.dados.gov.br/fornecedores/v1/fornecedores.json?uf=${config.uf.toUpperCase()}&offset=0&limit=${limit}`;
 
     logger.info(`SICAF: buscando fornecedores UF=${config.uf} limit=${limit}`);
 

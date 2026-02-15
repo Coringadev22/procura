@@ -186,8 +186,31 @@ export async function executeJob(jobId: number): Promise<void> {
 
         activeFonte = dataSource.name;
         for (const sr of sourceResults) {
-          if (sr.email && !recipientMap.has(sr.email.toLowerCase())) {
-            recipientMap.set(sr.email.toLowerCase(), {
+          // For populate_leads: save ALL results (even without email)
+          // For email_send: only save results with email
+          const key = sr.email
+            ? sr.email.toLowerCase()
+            : `cnpj:${sr.cnpj}`;
+          if (job.jobType === "populate_leads") {
+            if (!recipientMap.has(key)) {
+              recipientMap.set(key, {
+                email: sr.email || "",
+                cnpj: sr.cnpj,
+                empresa: sr.razaoSocial || "",
+                nomeFantasia: null,
+                cnaePrincipal: sr.cnaePrincipal || null,
+                emailCategory: "empresa",
+                telefones: sr.telefones || null,
+                municipio: sr.municipio || null,
+                uf: sr.uf || null,
+                valor: sr.valorHomologado
+                  ? `R$ ${sr.valorHomologado.toLocaleString("pt-BR")}`
+                  : "",
+                valorNum: sr.valorHomologado ?? null,
+              });
+            }
+          } else if (sr.email && !recipientMap.has(key)) {
+            recipientMap.set(key, {
               email: sr.email,
               cnpj: sr.cnpj,
               empresa: sr.razaoSocial || "",
