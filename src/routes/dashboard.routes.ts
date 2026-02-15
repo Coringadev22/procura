@@ -479,7 +479,28 @@ const HTML = `<!DOCTYPE html>
     <!-- ============ AUTOMACAO ============ -->
     <div class="panel" id="panel-automacao">
       <div class="info-box" style="border-left-color:#f59e0b">
-        <strong>Automacao:</strong> Configure jobs que buscam automaticamente emails de licitacoes e enviam templates por email em intervalos regulares. Cada job roda de forma independente com sua propria configuracao de busca, template e filtros.
+        <strong>Automacao de Leads:</strong> O sistema busca automaticamente fornecedores em diversas APIs governamentais, extrai os CNPJs, enriquece com email/telefone via consulta CNPJ e salva como leads categorizados por estado e tipo (empresa/contabilidade).
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+          <div style="background:#1e293b;padding:8px 10px;border-radius:6px;border-left:3px solid #3b82f6">
+            <strong style="color:#60a5fa">B-XX: PNCP Licitacoes</strong><br>
+            <span style="color:#94a3b8">Busca licitacoes no PNCP (pncp.gov.br/api/search), filtra por estado e resultado, extrai fornecedores vencedores. Roda a cada 6h.</span>
+          </div>
+          <div style="background:#1e293b;padding:8px 10px;border-radius:6px;border-left:3px solid #3b82f6">
+            <strong style="color:#60a5fa">C-XX: PNCP Contratos</strong><br>
+            <span style="color:#94a3b8">Busca contratos firmados via API de consulta do PNCP (pncp.gov.br/api/consulta/v1/contratos). Inclui dispensas e inexigibilidades. Roda a cada 8h.</span>
+          </div>
+          <div style="background:#1e293b;padding:8px 10px;border-radius:6px;border-left:3px solid #22c55e">
+            <strong style="color:#4ade80">S-XX: SICAF (Compras.gov)</strong><br>
+            <span style="color:#94a3b8">Fornecedores cadastrados no Sistema de Cadastro de Fornecedores (compras.dados.gov.br). Filtra por UF, retorna PJ com CNPJ. Roda a cada 12h.</span>
+          </div>
+          <div style="background:#1e293b;padding:8px 10px;border-radius:6px;border-left:3px solid #eab308">
+            <strong style="color:#facc15">TCE-RJ</strong><br>
+            <span style="color:#94a3b8">Contratos do Tribunal de Contas do RJ (dados.tcerj.tc.br/api/v1). Somente estado do Rio de Janeiro.</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#64748b">
+          <strong>Enriquecimento:</strong> CNPJs sao consultados via BrasilAPI, ReceitaWS e CNPJ.ws para obter email, telefone, CNAE e municipio. Leads sao classificados automaticamente como empresa ou contabilidade.
+        </div>
       </div>
 
       <div id="auto-status" class="stats"></div>
