@@ -8,6 +8,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default("noreply@procura.com"),
   RESEND_FROM_NAME: z.string().default("Procura"),
+  RESEND_REPLY_TO: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

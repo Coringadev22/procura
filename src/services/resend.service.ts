@@ -62,12 +62,17 @@ export async function sendEmail(
     const subject = renderTemplate(template.subject, templateVars);
     const body = renderTemplate(template.body, templateVars);
 
-    const { data, error } = await client.emails.send({
+    const sendPayload: any = {
       from: `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>`,
       to: [recipientEmail],
       subject,
       html: body,
-    });
+    };
+    if (env.RESEND_REPLY_TO) {
+      sendPayload.reply_to = env.RESEND_REPLY_TO;
+    }
+
+    const { data, error } = await client.emails.send(sendPayload);
 
     if (error) {
       logger.error(`Resend error: ${error.message}`);
