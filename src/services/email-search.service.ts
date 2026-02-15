@@ -1,5 +1,6 @@
 import { fetchWithRetry } from "../utils/retry.js";
 import { enrichLicitacao } from "./email-enrichment.service.js";
+import { searchContratacoesByDate } from "./pncp-consulta.service.js";
 import { lookupMultipleCnpjs } from "./cnpj-lookup.service.js";
 import { logger } from "../utils/logger.js";
 import type { FornecedorComEmail } from "../types/api.types.js";
@@ -51,49 +52,104 @@ export async function runEmailSearch(params: EmailSearchParams): Promise<EmailSe
     ? Math.min(params.minResultados, 200)
     : 20;
 
-  // === PHASE 1: Find licitações with resultado from PNCP Search ===
+  // === PHASE 1: Find licitações with resultado ===
   const comResultado: PncpSearchItem[] = [];
   let totalAnalisadas = 0;
-  const maxPages = 30;
-  const pageSize = 50;
 
-  logger.info(
-    `Busca-emails: q="${q}" uf=${uf || "todas"} buscando ate ${minResultados} licitacoes com resultado`
-  );
-
-  for (let page = 1; page <= maxPages; page++) {
-    const result = await fetchSearchPage(q, page, pageSize);
-    let items = result.items;
-
-    if (!items || items.length === 0) break;
-
-    if (uf) {
-      items = items.filter((item) => item.uf === uf);
-    }
-
-    if (dataInicial || dataFinal) {
-      items = items.filter((item) => {
-        const pubDate = item.data_publicacao_pncp?.substring(0, 10).replace(/-/g, "");
-        if (dataInicial && pubDate < dataInicial) return false;
-        if (dataFinal && pubDate > dataFinal) return false;
-        return true;
-      });
-    }
-
-    totalAnalisadas += result.items.length;
-
-    for (const item of items) {
-      if (item.tem_resultado) {
-        comResultado.push(item);
-      }
-    }
+  if (uf) {
+    // Use Consulta API with native UF filter (much more efficient per state)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const di = dataInicial || thirtyDaysAgo.toISOString().slice(0, 10).replace(/-/g, "");
+    const df = dataFinal || now.toISOString().slice(0, 10).replace(/-/g, "");
 
     logger.info(
-      `  Pagina ${page}: ${result.items.length} itens, ${items.length} com UF, ${comResultado.length} com resultado ate agora`
+      `Busca-emails: UF=${uf} via Consulta API ${di}-${df}, buscando ate ${minResultados} licitacoes com resultado`
     );
 
-    if (comResultado.length >= minResultados) break;
-    if (result.items.length < pageSize) break;
+    const maxPages = 10;
+    const pageSize = 50;
+
+    for (let page = 1; page <= maxPages; page++) {
+      try {
+        const result = await searchContratacoesByDate({
+          dataInicial: di,
+          dataFinal: df,
+          uf,
+          pagina: page,
+          tamanhoPagina: pageSize,
+        });
+
+        if (!result.data || result.data.length === 0) break;
+        totalAnalisadas += result.data.length;
+
+        for (const c of result.data) {
+          if (c.existeResultado) {
+            comResultado.push({
+              orgao_cnpj: c.orgaoEntidade.cnpj,
+              orgao_nome: c.orgaoEntidade.razaoSocial,
+              uf: c.unidadeOrgao.ufSigla,
+              municipio_nome: c.unidadeOrgao.municipioNome,
+              tem_resultado: true,
+              ano: String(c.anoCompra),
+              numero_sequencial: String(c.sequencialCompra),
+              description: c.objetoCompra,
+              data_publicacao_pncp: c.dataPublicacaoPncp,
+              numero_controle_pncp: c.numeroControlePNCP,
+            } as PncpSearchItem);
+          }
+        }
+
+        logger.info(
+          `  Pagina ${page}: ${result.data.length} contratacoes, ${comResultado.length} com resultado ate agora`
+        );
+
+        if (comResultado.length >= minResultados) break;
+        if (result.data.length < pageSize) break;
+      } catch (err: any) {
+        logger.error(`Consulta API page ${page} error: ${err.message}`);
+        break;
+      }
+    }
+  } else {
+    // No UF: use Search API (broader, but no native UF filter)
+    const maxPages = 30;
+    const pageSize = 50;
+
+    logger.info(
+      `Busca-emails: q="${q}" uf=todas buscando ate ${minResultados} licitacoes com resultado`
+    );
+
+    for (let page = 1; page <= maxPages; page++) {
+      const result = await fetchSearchPage(q, page, pageSize);
+      let items = result.items;
+
+      if (!items || items.length === 0) break;
+
+      if (dataInicial || dataFinal) {
+        items = items.filter((item) => {
+          const pubDate = item.data_publicacao_pncp?.substring(0, 10).replace(/-/g, "");
+          if (dataInicial && pubDate < dataInicial) return false;
+          if (dataFinal && pubDate > dataFinal) return false;
+          return true;
+        });
+      }
+
+      totalAnalisadas += result.items.length;
+
+      for (const item of items) {
+        if (item.tem_resultado) {
+          comResultado.push(item);
+        }
+      }
+
+      logger.info(
+        `  Pagina ${page}: ${result.items.length} itens, ${comResultado.length} com resultado ate agora`
+      );
+
+      if (comResultado.length >= minResultados) break;
+      if (result.items.length < pageSize) break;
+    }
   }
 
   if (comResultado.length === 0) {
@@ -105,7 +161,7 @@ export async function runEmailSearch(params: EmailSearchParams): Promise<EmailSe
       licitacoesAnalisadas: totalAnalisadas,
       licitacoesComResultado: 0,
       emails: [],
-      message: "Nenhuma licitacao com resultado encontrada. Tente uma busca mais ampla.",
+      message: "Nenhuma licitacao com resultado encontrada para " + (uf || "esta busca") + ". Tente uma busca mais ampla.",
     };
   }
 
