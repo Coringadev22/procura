@@ -188,6 +188,7 @@ export const leads = pgTable("leads", {
   uf: text("uf"),
   cnaePrincipal: text("cnae_principal"),
   origem: text("origem").notNull().default("manual"),
+  fonte: text("fonte"),
   valorHomologado: real("valor_homologado"),
   categoria: text("categoria").notNull().default("empresa"),
   createdAt: text("created_at")

@@ -8,8 +8,14 @@ import {
   executeJob,
   getSchedulerStatus,
 } from "../services/automation.service.js";
+import { getAvailableSources } from "../services/data-sources/index.js";
 
 export async function automationRoutes(app: FastifyInstance) {
+  // List available data sources
+  app.get("/api/data-sources", async () => {
+    return getAvailableSources();
+  });
+
   // Get scheduler status
   app.get("/api/automation/status", async () => {
     return await getSchedulerStatus();

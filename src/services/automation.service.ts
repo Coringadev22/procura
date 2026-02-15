@@ -10,6 +10,7 @@ import {
 import { sendEmail } from "./gmail.service.js";
 import { runEmailSearch } from "./email-search.service.js";
 import { classifyLead } from "../utils/email-category.js";
+import { getSource } from "./data-sources/index.js";
 import { logger } from "../utils/logger.js";
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
@@ -168,8 +169,46 @@ export async function executeJob(jobId: number): Promise<void> {
     }
 
     const recipientMap = new Map<string, Recipient>();
+    let activeFonte = job.sourceType || "pncp";
 
-    if (job.sourceType === "search" || job.sourceType === "both") {
+    // Try modular data source first
+    const dataSource = getSource(job.sourceType);
+
+    if (dataSource) {
+      // Use modular data source adapter
+      try {
+        const sourceResults = await dataSource.fetch({
+          keyword: job.searchKeyword || undefined,
+          uf: job.searchUf ?? undefined,
+          quantity: job.searchQuantity,
+          cnae: job.searchCnae ?? undefined,
+        });
+
+        activeFonte = dataSource.name;
+        for (const sr of sourceResults) {
+          if (sr.email && !recipientMap.has(sr.email.toLowerCase())) {
+            recipientMap.set(sr.email.toLowerCase(), {
+              email: sr.email,
+              cnpj: sr.cnpj,
+              empresa: sr.razaoSocial || "",
+              nomeFantasia: null,
+              cnaePrincipal: sr.cnaePrincipal || null,
+              emailCategory: "empresa",
+              telefones: sr.telefones || null,
+              municipio: sr.municipio || null,
+              uf: sr.uf || null,
+              valor: sr.valorHomologado
+                ? `R$ ${sr.valorHomologado.toLocaleString("pt-BR")}`
+                : "",
+              valorNum: sr.valorHomologado ?? null,
+            });
+          }
+        }
+      } catch (err: any) {
+        logger.error(`Data source ${job.sourceType} error: ${err.message}`);
+      }
+    } else if (job.sourceType === "search" || job.sourceType === "both") {
+      // Legacy: use old search flow
       try {
         const searchResult = await runEmailSearch({
           q: job.searchKeyword,
@@ -177,6 +216,7 @@ export async function executeJob(jobId: number): Promise<void> {
           minResultados: job.searchQuantity,
         });
 
+        activeFonte = "pncp";
         for (const f of searchResult.data) {
           if (f.email && !recipientMap.has(f.email.toLowerCase())) {
             recipientMap.set(f.email.toLowerCase(), {
@@ -207,6 +247,7 @@ export async function executeJob(jobId: number): Promise<void> {
         .from(fornecedores)
         .where(isNotNull(fornecedores.email));
 
+      activeFonte = "fornecedores";
       for (const f of dbFornecedores) {
         if (f.email && !recipientMap.has(f.email.toLowerCase())) {
           recipientMap.set(f.email.toLowerCase(), {
@@ -281,6 +322,7 @@ export async function executeJob(jobId: number): Promise<void> {
           uf: r.uf || null,
           cnaePrincipal: r.cnaePrincipal || null,
           origem: "auto_job_" + jobId,
+          fonte: activeFonte,
           valorHomologado: r.valorNum,
           categoria,
         });

@@ -1,4 +1,4 @@
-export type EmailCategory = "empresa" | "provavel_contabilidade" | "contabilidade";
+export type EmailCategory = "empresa" | "contabilidade";
 
 const CONTABILIDADE_DOMAIN_PATTERNS = [
   "contab",
@@ -45,6 +45,11 @@ const CONTABILIDADE_CNAE_PATTERNS = [
   "69.20",
   "6920-6",
   "atividades de contabilidade",
+  "consultoria",
+  "advocacia",
+  "69.1",
+  "69.2",
+  "69.3",
 ];
 
 const CONTABILIDADE_NOME_PATTERNS = [
@@ -58,13 +63,6 @@ const CONTABILIDADE_NOME_PATTERNS = [
   "pericias",
 ];
 
-const PROVAVEL_CONTAB_CNAE_PATTERNS = [
-  "consultoria",
-  "advocacia",
-  "69.1",
-  "69.2",
-  "69.3",
-];
 
 function hasContabilidadeDomain(email: string): boolean {
   const domain = email.split("@")[1]?.toLowerCase() ?? "";
@@ -96,7 +94,7 @@ export function detectEmailCategory(
 
   // Camada 1b: Detecção por prefixo
   if (hasContabilidadePrefix(email)) {
-    return "provavel_contabilidade";
+    return "contabilidade";
   }
 
   // Camada 2: Comparação entre fontes
@@ -106,7 +104,7 @@ export function detectEmailCategory(
 
   // Camada 3: Sugestão pela fonte
   if (source === "receitaws") {
-    return "provavel_contabilidade";
+    return "contabilidade";
   }
 
   return "empresa";
@@ -139,14 +137,9 @@ export function classifyLead(
     return "contabilidade";
   }
 
-  // 4. Email prefixo indica provavel contabilidade
+  // 4. Email prefixo indica contabilidade
   if (email && hasContabilidadePrefix(email)) {
-    return "provavel_contabilidade";
-  }
-
-  // 5. CNAE de area correlata (consultoria, advocacia) = provavel
-  if (PROVAVEL_CONTAB_CNAE_PATTERNS.some((p) => cnae.includes(p))) {
-    return "provavel_contabilidade";
+    return "contabilidade";
   }
 
   return "empresa";

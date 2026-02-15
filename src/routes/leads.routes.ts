@@ -30,9 +30,8 @@ export async function leadsRoutes(app: FastifyInstance) {
     const total = all.length;
     const comEmail = all.filter((l) => l.email).length;
     const empresas = all.filter((l) => l.categoria === "empresa").length;
-    const provContab = all.filter((l) => l.categoria === "provavel_contabilidade").length;
     const contabilidades = all.filter((l) => l.categoria === "contabilidade").length;
-    return { total, comEmail, empresas, provContab, contabilidades };
+    return { total, comEmail, empresas, contabilidades };
   });
 
   // Add single lead
@@ -47,6 +46,7 @@ export async function leadsRoutes(app: FastifyInstance) {
       uf?: string;
       cnaePrincipal?: string;
       origem?: string;
+      fonte?: string;
       valorHomologado?: number;
       categoria?: string;
     };
@@ -79,6 +79,7 @@ export async function leadsRoutes(app: FastifyInstance) {
       uf: body.uf || null,
       cnaePrincipal: body.cnaePrincipal || null,
       origem: body.origem || "manual",
+      fonte: body.fonte || null,
       valorHomologado: body.valorHomologado || null,
       categoria: body.categoria || "empresa",
     }).returning({ id: leads.id });
@@ -99,6 +100,7 @@ export async function leadsRoutes(app: FastifyInstance) {
         uf?: string;
         cnaePrincipal?: string;
         origem?: string;
+        fonte?: string;
         valorHomologado?: number;
         categoria?: string;
       }>;
@@ -130,6 +132,7 @@ export async function leadsRoutes(app: FastifyInstance) {
         uf: item.uf || null,
         cnaePrincipal: item.cnaePrincipal || null,
         origem: item.origem || "manual",
+        fonte: item.fonte || null,
         valorHomologado: item.valorHomologado || null,
         categoria: item.categoria || "empresa",
       });
@@ -164,8 +167,7 @@ export async function leadsRoutes(app: FastifyInstance) {
       if (!lead) return { error: "Lead nao encontrado" };
 
       const cycle: Record<string, string> = {
-        empresa: "provavel_contabilidade",
-        provavel_contabilidade: "contabilidade",
+        empresa: "contabilidade",
         contabilidade: "empresa",
       };
       const next = cycle[lead.categoria] || "empresa";

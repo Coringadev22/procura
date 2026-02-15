@@ -257,7 +257,6 @@ const HTML = `<!DOCTYPE html>
       <div class="actions-bar" id="leads-actions">
         <button class="filter-btn active" id="filter-todos" onclick="filterLeads('todos')">Todos</button>
         <button class="filter-btn" id="filter-empresa" onclick="filterLeads('empresa')">Empresas</button>
-        <button class="filter-btn" id="filter-provavel_contabilidade" onclick="filterLeads('provavel_contabilidade')">Prov. Contab.</button>
         <button class="filter-btn" id="filter-contabilidade" onclick="filterLeads('contabilidade')">Contabilidades</button>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <input type="text" id="leads-cnae-filter" placeholder="Filtrar por CNAE / Atividade..." oninput="leadPage=1;renderLeads()" style="padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px;width:200px">
@@ -435,7 +434,7 @@ const HTML = `<!DOCTYPE html>
           <input type="hidden" id="tpl-edit-id" value="">
           <div class="form-row">
             <div class="form-group" style="flex:2"><label>Nome do Template</label><input type="text" id="tpl-name" placeholder="Ex: Proposta para empresas"></div>
-            <div class="form-group" style="flex:1"><label>Categoria Alvo</label><select id="tpl-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Todos</option><option value="empresa">Empresa</option><option value="contabilidade">Contabilidade</option><option value="provavel_contabilidade">Prov. Contabilidade</option></select></div>
+            <div class="form-group" style="flex:1"><label>Categoria Alvo</label><select id="tpl-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Todos</option><option value="empresa">Empresa</option><option value="contabilidade">Contabilidade</option></select></div>
           </div>
           <div class="form-group" style="margin-top:12px"><label>Assunto</label><input type="text" id="tpl-subject" placeholder="Ex: Proposta de parceria - {empresa}"></div>
           <div class="form-group" style="margin-top:12px"><label>Corpo do Email (HTML, use {empresa}, {cnpj}, {valor}, {cidade}, {uf}, {contato})</label><textarea id="tpl-body" rows="8" style="width:100%;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:12px;font-size:13px;font-family:monospace;resize:vertical" placeholder="Prezado(a) {contato},&#10;&#10;Gostaríamos de apresentar nossos serviços..."></textarea></div>
@@ -461,7 +460,6 @@ const HTML = `<!DOCTYPE html>
             <select id="gmail-send-filter" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px">
               <option value="todos">Todos com email</option>
               <option value="empresa">Apenas Empresas</option>
-              <option value="provavel_contabilidade">Prov. Contabilidade</option>
               <option value="contabilidade">Apenas Contabilidades</option>
             </select>
           </div>
@@ -508,14 +506,14 @@ const HTML = `<!DOCTYPE html>
           </div>
           <div class="form-row" style="margin-top:12px">
             <div class="form-group"><label>Filtro CNAE (opcional)</label><input type="text" id="auto-cnae" placeholder="Ex: informatica, alimentacao..."></div>
-            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="search">Busca PNCP</option><option value="fornecedores">Fornecedores existentes</option><option value="both">Ambos</option></select></div>
+            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="transparencia">Portal Transparencia</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
           </div>
           <div id="auto-email-fields" class="form-row" style="margin-top:12px;display:none">
             <div class="form-group"><label>Conta Gmail</label><select id="auto-gmail" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
             <div class="form-group"><label>Template</label><select id="auto-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
           </div>
           <div class="form-row" style="margin-top:12px">
-            <div class="form-group"><label>Categoria Alvo</label><select id="auto-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="all">Todos</option><option value="empresa">Empresas</option><option value="contabilidade">Contabilidades</option><option value="provavel_contabilidade">Prov. Contabilidade</option></select></div>
+            <div class="form-group"><label>Categoria Alvo</label><select id="auto-category" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="all">Todos</option><option value="empresa">Empresas</option><option value="contabilidade">Contabilidades</option></select></div>
             <div class="form-group" style="flex:0.5"><label>Max Leads/Execucao</label><input type="number" id="auto-max" value="50" min="1" max="450"></div>
           </div>
           <div style="margin-top:12px;display:flex;gap:8px">
@@ -590,7 +588,7 @@ const leadsPerPage = 50;
 
 function autoCategoria(emailCategory, email) {
   if (emailCategory === 'contabilidade') return 'contabilidade';
-  if (emailCategory === 'provavel_contabilidade') return 'provavel_contabilidade';
+  if (emailCategory === 'provavel_contabilidade') return 'contabilidade';
   if (emailCategory === 'empresa') return 'empresa';
   if (email) {
     const domain = (email.split('@')[1] || '').toLowerCase();
@@ -627,6 +625,7 @@ async function addLead(data) {
       uf: data.uf || null,
       cnaePrincipal: data.cnaePrincipal || null,
       origem: data.origem || 'manual',
+      fonte: data.fonte || null,
       valorHomologado: data.valorHomologado || null,
       categoria: data.categoria || autoCategoria(data.emailCategory, data.email),
     });
@@ -675,15 +674,24 @@ async function reclassifyLeads() {
 
 function catBadge(cat) {
   if (cat === 'empresa') return 'badge-green';
-  if (cat === 'provavel_contabilidade') return 'badge-yellow';
+
   if (cat === 'contabilidade') return 'badge-orange';
   return 'badge-gray';
 }
 function catLabel(cat) {
   if (cat === 'empresa') return 'Empresa';
-  if (cat === 'provavel_contabilidade') return 'Prov. Contab.';
   if (cat === 'contabilidade') return 'Contabilidade';
   return 'N/D';
+}
+function fonteBadge(f) {
+  var c = { pncp:'badge-blue', pncp_contratos:'badge-blue', sicaf:'badge-green', tce_rj:'badge-yellow', transparencia:'badge-orange', manual:'badge-gray', fornecedores:'badge-gray' };
+  return c[f] || 'badge-gray';
+}
+function fonteLabel(f) {
+  var c = { pncp:'PNCP', pncp_contratos:'PNCP Contratos', sicaf:'SICAF', tce_rj:'TCE-RJ', transparencia:'Transparencia', manual:'Manual', fornecedores:'Fornecedores' };
+  if (c[f]) return c[f];
+  if (f && f.startsWith('auto_job_')) return 'PNCP';
+  return f || '-';
 }
 async function toggleCategoria(cnpj) {
   try {
@@ -705,7 +713,6 @@ function filterLeads(f) {
   const btn = document.getElementById('filter-' + f);
   if (btn) {
     if (f === 'empresa') btn.classList.add('active-green');
-    else if (f === 'provavel_contabilidade') btn.classList.add('active-yellow');
     else if (f === 'contabilidade') btn.classList.add('active-orange');
     else btn.classList.add('active');
   }
@@ -726,14 +733,12 @@ function renderLeads() {
 
   const comEmail = leads.filter(l => l.email).length;
   const empresas = leads.filter(l => l.categoria === 'empresa').length;
-  const provContab = leads.filter(l => l.categoria === 'provavel_contabilidade').length;
   const contabs = leads.filter(l => l.categoria === 'contabilidade').length;
 
   statsEl.innerHTML =
     '<div class="stat"><div class="stat-value blue">' + leads.length + '</div><div class="stat-label">Total de leads</div></div>' +
     '<div class="stat"><div class="stat-value green">' + comEmail + '</div><div class="stat-label">Com email</div></div>' +
     '<div class="stat"><div class="stat-value" style="color:#22c55e">' + empresas + '</div><div class="stat-label">Empresas</div></div>' +
-    '<div class="stat"><div class="stat-value" style="color:#eab308">' + provContab + '</div><div class="stat-label">Prov. Contab.</div></div>' +
     '<div class="stat"><div class="stat-value" style="color:#f97316">' + contabs + '</div><div class="stat-label">Contabilidades</div></div>';
 
   actionsEl.style.display = leads.length > 0 ? 'flex' : 'none';
@@ -758,7 +763,7 @@ function renderLeads() {
     else if (sc === 'categoria') { va = a.categoria || ''; vb = b.categoria || ''; }
     else if (sc === 'cnae') { va = (a.cnaePrincipal || '').toLowerCase(); vb = (b.cnaePrincipal || '').toLowerCase(); }
     else if (sc === 'cidade') { va = ((a.municipio || '') + (a.uf || '')).toLowerCase(); vb = ((b.municipio || '') + (b.uf || '')).toLowerCase(); }
-    else if (sc === 'origem') { va = (a.origem || '').toLowerCase(); vb = (b.origem || '').toLowerCase(); }
+    else if (sc === 'fonte') { va = (a.fonte || a.origem || '').toLowerCase(); vb = (b.fonte || b.origem || '').toLowerCase(); }
     else { va = (a.razaoSocial || '').toLowerCase(); vb = (b.razaoSocial || '').toLowerCase(); }
     if (va < vb) return -1 * sd;
     if (va > vb) return 1 * sd;
@@ -785,7 +790,7 @@ function renderLeads() {
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'categoria\\')">Categoria' + sortIcon('categoria') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'cnae\\')">Atividade (CNAE)' + sortIcon('cnae') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'cidade\\')">Cidade/UF' + sortIcon('cidade') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'origem\\')">Origem' + sortIcon('origem') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'fonte\\')">Fonte' + sortIcon('fonte') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'valor\\')">Valor' + sortIcon('valor') + '</th>' +
     '<th></th>' +
     '</tr></thead><tbody>';
@@ -798,7 +803,7 @@ function renderLeads() {
       '<td><button class="badge-cat badge ' + catBadge(l.categoria) + '" onclick="toggleCategoria(\\''+l.cnpj+'\\');event.stopPropagation()" title="Clique para alterar">' + catLabel(l.categoria) + '</button></td>' +
       '<td style="font-size:11px;color:#94a3b8;max-width:180px" title="' + (l.cnaePrincipal||'').replace(/"/g,'') + '">' + cnaeShort + '</td>' +
       '<td style="font-size:12px">' + (l.municipio || '') + (l.uf ? '/' + l.uf : '') + '</td>' +
-      '<td><span class="badge badge-blue">' + (l.origem || '-') + '</span></td>' +
+      '<td><span class="badge ' + fonteBadge(l.fonte || l.origem) + '">' + fonteLabel(l.fonte || l.origem || '-') + '</span></td>' +
       '<td style="font-size:12px;color:#22c55e;font-weight:600">' + money(l.valorHomologado) + '</td>' +
       '<td><button class="btn btn-xs btn-red" onclick="removeLead(\\''+l.cnpj+'\\')">X</button></td>' +
       '</tr>';
@@ -835,9 +840,9 @@ function copyLeadEmails() {
 function exportLeadsCSV() {
   const source = leadFilter === 'todos' ? leads : leads.filter(l => l.categoria === leadFilter);
   if (source.length === 0) return showToast('Nenhum lead para exportar', true);
-  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Origem,Categoria,Valor Homologado';
+  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Fonte,Categoria,Valor Homologado';
   const rows = source.map(l => {
-    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.origem||'', l.categoria||'', l.valorHomologado||''].join(',');
+    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.fonte||l.origem||'', l.categoria||'', l.valorHomologado||''].join(',');
   });
   const csv = header + '\\n' + rows.join('\\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -848,7 +853,7 @@ function exportLeadsCSV() {
   showToast('CSV exportado com ' + source.length + ' leads!');
 }
 
-async function addAllLeads(dataArray, origem) {
+async function addAllLeads(dataArray, origem, fonte) {
   const items = dataArray.map(f => ({
     cnpj: (f.cnpj || '').replace(/\\D/g, ''),
     razaoSocial: f.razaoSocial || null,
@@ -859,6 +864,7 @@ async function addAllLeads(dataArray, origem) {
     uf: f.uf || null,
     cnaePrincipal: f.cnaePrincipal || null,
     origem: origem,
+    fonte: fonte || null,
     valorHomologado: f.valorHomologado || null,
     categoria: autoCategoria(f.emailCategory, f.email),
   })).filter(i => i.cnpj);
@@ -995,7 +1001,7 @@ async function buscaEmails() {
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
           '<h3 style="font-size:15px;color:#f8fafc">Emails Encontrados (' + data.emails.length + ')</h3>' +
           '<div style="display:flex;gap:8px"><button class="btn btn-green btn-sm" onclick="copyEmails()">Copiar Emails</button>' +
-          '<button class="btn btn-primary btn-sm" onclick="addAllLeads(lastBuscaData,\\'busca-emails\\')">Adicionar Todos aos Leads</button></div>' +
+          '<button class="btn btn-primary btn-sm" onclick="addAllLeads(lastBuscaData,\\'busca-emails\\',\\'pncp\\')">Adicionar Todos aos Leads</button></div>' +
         '</div>' +
         '<textarea id="be-emails-text" readonly style="width:100%;height:100px;background:#0f172a;color:#22c55e;border:1px solid #334155;border-radius:8px;padding:12px;font-size:13px;font-family:monospace;resize:vertical">' +
         data.emails.join('\\n') +
@@ -1026,7 +1032,7 @@ async function buscaEmails() {
         '<td style="font-size:12px">' + (f.municipio||'') + (f.uf ? '/' + f.uf : '') + '</td>' +
         '<td style="font-size:12px;font-weight:600;color:#22c55e">' + money(f.valorHomologado) + '</td>' +
         '<td><span class="badge ' + (f.emailSource === 'not_found' || f.emailSource === 'lookup_failed' ? 'badge-gray' : 'badge-blue') + '">' + f.emailSource + '</span>' +
-        (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange" title="Confirmado contabilidade (dominio)">CONTAB</span>' : f.emailCategory === 'provavel_contabilidade' ? ' <span class="badge badge-yellow" title="Provavel contabilidade (ReceitaWS)">PROV. CONTAB</span>' : '') + '</td>' +
+        (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange" title="Contabilidade">CONTAB</span>' : '') + '</td>' +
         '<td><button class="btn-add' + (isInLeads ? ' added' : '') + '" onclick="addLeadFromBusca(' + i + ',this)" title="Adicionar aos Meus Leads">' + (isInLeads ? '\\u2713' : '+') + '</button></td>' +
         '</tr>';
     });
@@ -1045,7 +1051,7 @@ async function buscaEmails() {
 async function addLeadFromBusca(index, btnEl) {
   const f = lastBuscaData[index];
   if (!f) return;
-  const ok = await addLead({ ...f, origem: 'busca-emails' });
+  const ok = await addLead({ ...f, origem: 'busca-emails', fonte: 'pncp' });
   if (ok && btnEl) { btnEl.textContent = '\\u2713'; btnEl.classList.add('added'); }
 }
 
@@ -1232,7 +1238,7 @@ async function searchFornecedores() {
           '<div class="item"><label>Atividade (CNAE)</label><span style="font-size:12px">' + (f.cnaePrincipal||'-') + '</span></div>' +
           '<div class="item"><label>Valor Homologado</label><span style="color:#22c55e;font-weight:600">' + money(f.valorHomologado) + '</span></div>' +
           '<div class="item"><label>Fonte do Email</label><span><span class="badge badge-blue">' + f.emailSource + '</span>' +
-            (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange">CONTAB</span>' : f.emailCategory === 'provavel_contabilidade' ? ' <span class="badge badge-yellow">PROV. CONTAB</span>' : '') + '</span></div>' +
+            (f.emailCategory === 'contabilidade' ? ' <span class="badge badge-orange">CONTAB</span>' : '') + '</span></div>' +
           '<div class="item"><label>Itens Fornecidos</label><span style="font-size:11px;color:#94a3b8">' + (f.itemDescricao||'-').substring(0,200) + '</span></div>' +
         '</div>' +
       '</div>';
@@ -1247,7 +1253,7 @@ async function searchFornecedores() {
 async function addLeadFromForn(index, btnEl) {
   const f = lastFornData[index];
   if (!f) return;
-  const ok = await addLead({ ...f, origem: 'fornecedores' });
+  const ok = await addLead({ ...f, origem: 'fornecedores', fonte: 'pncp' });
   if (ok && btnEl) { btnEl.textContent = '\\u2713'; btnEl.classList.add('added'); }
 }
 
@@ -1674,7 +1680,7 @@ function showAutoJobForm(id) {
       document.getElementById('auto-uf').value = j.searchUf || '';
       document.getElementById('auto-qty').value = j.searchQuantity;
       document.getElementById('auto-cnae').value = j.searchCnae || '';
-      document.getElementById('auto-source').value = j.sourceType || 'search';
+      document.getElementById('auto-source').value = j.sourceType || 'pncp';
       document.getElementById('auto-gmail').value = j.gmailAccountId || '';
       document.getElementById('auto-template').value = j.templateId || '';
       document.getElementById('auto-category').value = j.targetCategory || 'all';
@@ -1687,7 +1693,7 @@ function showAutoJobForm(id) {
     document.getElementById('auto-uf').value = '';
     document.getElementById('auto-qty').value = '20';
     document.getElementById('auto-cnae').value = '';
-    document.getElementById('auto-source').value = 'search';
+    document.getElementById('auto-source').value = 'pncp';
     document.getElementById('auto-category').value = 'all';
     document.getElementById('auto-max').value = '50';
   }
