@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { eq, desc } from "drizzle-orm";
 import { db } from "../config/database.js";
-import { emailTemplates, emailSendLog, inboundEmails, leads } from "../db/schema.js";
+import { emailTemplates, emailSendLog, automationJobs, inboundEmails, leads } from "../db/schema.js";
 import {
   isConfigured,
   getStatus,
@@ -77,6 +77,9 @@ export async function resendRoutes(app: FastifyInstance) {
     "/api/email/templates/:id",
     async (request) => {
       const id = Number(request.params.id);
+      // Remove FK references before deleting
+      await db.update(emailSendLog).set({ templateId: null }).where(eq(emailSendLog.templateId, id));
+      await db.update(automationJobs).set({ templateId: null }).where(eq(automationJobs.templateId, id));
       await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
       return { success: true };
     }
