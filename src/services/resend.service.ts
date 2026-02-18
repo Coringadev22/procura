@@ -138,3 +138,43 @@ export async function sendEmail(
     return { success: false, error: err.message };
   }
 }
+
+export async function sendCampaignEmail(
+  lead: {
+    email: string | null;
+    cnpj: string;
+    razaoSocial: string | null;
+    nomeFantasia: string | null;
+    municipio: string | null;
+    uf: string | null;
+    valorHomologado: number | null;
+  },
+  template: { id: number },
+  sequence: number
+): Promise<boolean> {
+  if (!lead.email) return false;
+
+  const vars: Record<string, string> = {
+    empresa: lead.razaoSocial || lead.nomeFantasia || "",
+    cnpj: lead.cnpj,
+    email: lead.email,
+    contato: lead.razaoSocial || "",
+    valor: lead.valorHomologado
+      ? `R$ ${lead.valorHomologado.toLocaleString("pt-BR")}`
+      : "",
+    cidade: lead.municipio || "",
+    uf: lead.uf || "",
+  };
+
+  const result = await sendEmail(template.id, lead.email, lead.cnpj, vars);
+
+  if (result.success && result.messageId) {
+    // Tag the log entry with the campaign sequence
+    await db
+      .update(emailSendLog)
+      .set({ emailSequence: sequence })
+      .where(eq(emailSendLog.resendMessageId, result.messageId));
+  }
+
+  return result.success;
+}

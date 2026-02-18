@@ -134,6 +134,8 @@ export const emailSendLog = pgTable("email_send_log", {
   errorMessage: text("error_message"),
   resendMessageId: text("resend_message_id"),
   deliveryStatus: text("delivery_status"),
+  openedAt: text("opened_at"),
+  emailSequence: integer("email_sequence"),
   sentAt: text("sent_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

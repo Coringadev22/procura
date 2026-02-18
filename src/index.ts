@@ -13,6 +13,7 @@ import { resendRoutes } from "./routes/resend.routes.js";
 import { automationRoutes } from "./routes/automation.routes.js";
 import { leadsRoutes } from "./routes/leads.routes.js";
 import { startAutomationScheduler, cancelAllJobs } from "./services/automation.service.js";
+import { seedCampaignTemplates, startDailyCampaignScheduler, stopDailyCampaignScheduler } from "./services/campaign.service.js";
 
 const app = Fastify({
   logger: false,
@@ -51,6 +52,8 @@ try {
   await app.listen({ port: env.PORT, host: env.HOST });
 
   await startAutomationScheduler();
+  await seedCampaignTemplates();
+  startDailyCampaignScheduler();
 
   logger.info(`Servidor rodando em http://localhost:${env.PORT}`);
   logger.info(`Dashboard visual: http://localhost:${env.PORT}/`);
@@ -71,9 +74,11 @@ try {
 
 process.on("SIGINT", () => {
   cancelAllJobs();
+  stopDailyCampaignScheduler();
   process.exit(0);
 });
 process.on("SIGTERM", () => {
   cancelAllJobs();
+  stopDailyCampaignScheduler();
   process.exit(0);
 });

@@ -337,6 +337,7 @@ const HTML = `<!DOCTYPE html>
 
         <div class="sidebar-section">Comunicacao</div>
         <button class="nav-item" data-tab="email" data-active-class="active-purple" onclick="switchTab('email')"><span class="nav-icon">&#9993;</span> Email</button>
+        <button class="nav-item" data-tab="campanha" data-active-class="active-green" onclick="switchTab('campanha')"><span class="nav-icon">&#128640;</span> Campanha</button>
         <button class="nav-item" data-tab="automacao" data-active-class="active-amber" onclick="switchTab('automacao')"><span class="nav-icon">&#9889;</span> Automacao</button>
       </nav>
       <div class="sidebar-footer">v3.1 — Dados do PNCP</div>
@@ -667,6 +668,43 @@ const HTML = `<!DOCTYPE html>
       </div>
 
       <div style="margin-top:20px" id="email-history"></div>
+    </div>
+
+    <!-- ============ CAMPANHA DIARIA ============ -->
+    <div class="panel" id="panel-campanha">
+      <div class="info-box success">
+        <strong>Campanha Diaria Automatica:</strong> O sistema envia ate 100 emails por dia. <strong>V2 remarketing</strong> e enviado primeiro (leads que receberam V1 ha 7+ dias). <strong>V1 primeiro contato</strong> com o orcamento restante (90% empresa, 10% contabilidade). Falhas nao marcam o lead — sera tentado novamente no dia seguinte.
+      </div>
+
+      <div class="stats" id="campaign-status">
+        <div class="stat"><div class="stat-value">-</div><div class="stat-label">Carregando...</div></div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Pipeline de Leads</h2>
+          <button class="btn btn-green btn-sm" onclick="runCampaignNow()">Executar Campanha Agora</button>
+        </div>
+        <div id="campaign-pipeline"><div style="color:#64748b;font-size:13px;padding:8px">Carregando pipeline...</div></div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
+        <h2>Analitica de Emails</h2>
+        <div id="campaign-analytics" class="stats" style="margin-top:12px">
+          <div class="stat"><div class="stat-value">-</div><div class="stat-label">Carregando...</div></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px">
+        <div class="search-box">
+          <h2>Por Sequencia</h2>
+          <div id="campaign-by-sequence"><div style="color:#64748b;font-size:13px;padding:8px">Carregando...</div></div>
+        </div>
+        <div class="search-box">
+          <h2>Por Categoria</h2>
+          <div id="campaign-by-category"><div style="color:#64748b;font-size:13px;padding:8px">Carregando...</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- ============ AUTOMACAO ============ -->
@@ -1162,6 +1200,7 @@ function switchTab(tabName) {
   if (tabName === 'leads') renderLeads();
   if (tabName === 'licitacoes' && !licLoaded) { licLoaded = true; licPage = 1; searchLicitacoes(); }
   if (tabName === 'email' && !emailLoaded) { emailLoaded = true; loadEmailStatus(); }
+  if (tabName === 'campanha' && !campaignLoaded) { campaignLoaded = true; loadCampaign(); }
   if (tabName === 'automacao' && !autoLoaded) { autoLoaded = true; loadAutomacao(); }
 }
 
@@ -2215,6 +2254,86 @@ async function sendTestEmail() {
   } catch(e) {
     resEl.innerHTML = '<div class="info-box" style="margin:0;border-left-color:#ef4444"><strong>Erro:</strong> ' + e.message + '</div>';
   }
+}
+
+// ============ CAMPANHA DIARIA ============
+let campaignLoaded = false;
+
+async function loadCampaign() {
+  try {
+    const [stats, pipeline] = await Promise.all([
+      apiFetch('/api/email/campaign/stats'),
+      apiFetch('/api/email/campaign/pipeline')
+    ]);
+    renderCampaignStatus(stats, pipeline);
+    renderCampaignPipeline(pipeline);
+    renderCampaignAnalytics(stats);
+    renderCampaignBreakdowns(stats);
+  } catch(e) { showToast('Erro ao carregar campanha: ' + e.message, true); }
+}
+
+function renderCampaignStatus(stats, pipeline) {
+  document.getElementById('campaign-status').innerHTML =
+    '<div class="stat"><div class="stat-value" style="color:#22c55e">' + stats.totals.sentToday + '/' + stats.dailyLimit + '</div><div class="stat-label">Emails hoje</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#3b82f6">' + stats.remainingToday + '</div><div class="stat-label">Restantes hoje</div></div>' +
+    '<div class="stat"><div class="stat-value">' + pipeline.neverContacted + '</div><div class="stat-label">Aguardando V1</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#eab308">' + pipeline.readyForV2 + '</div><div class="stat-label">Prontos para V2</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#8b5cf6">' + pipeline.fullyProcessed + '</div><div class="stat-label">Concluidos</div></div>';
+}
+
+function pipelineCard(label, value, color, sub) {
+  return '<div style="flex:1;background:#162032;border-radius:8px;padding:14px;border-top:3px solid ' + color + '">' +
+    '<div style="font-size:24px;font-weight:700;color:' + color + '">' + value + '</div>' +
+    '<div style="font-size:11px;color:#94a3b8;margin-top:4px">' + label + '</div>' +
+    (sub ? '<div style="font-size:10px;color:#64748b;margin-top:2px">' + sub + '</div>' : '') +
+  '</div>';
+}
+
+function renderCampaignPipeline(p) {
+  document.getElementById('campaign-pipeline').innerHTML =
+    '<div style="display:flex;gap:8px;align-items:stretch;margin-top:8px">' +
+      pipelineCard('Total com Email', p.total, '#3b82f6') +
+      pipelineCard('Nunca contatados', p.neverContacted, '#22c55e', 'Empresas: ' + p.neverContactedEmpresa + ' | Contab: ' + p.neverContactedContab) +
+      pipelineCard('V1 enviado (aguardando 7d)', p.waitingForV2, '#eab308') +
+      pipelineCard('Prontos para V2', p.readyForV2, '#f97316') +
+      pipelineCard('V2 enviado (concluido)', p.fullyProcessed, '#8b5cf6') +
+    '</div>';
+}
+
+function renderCampaignAnalytics(stats) {
+  const t = stats.totals;
+  document.getElementById('campaign-analytics').innerHTML =
+    '<div class="stat"><div class="stat-value" style="color:#3b82f6">' + t.sent + '</div><div class="stat-label">Total enviados</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#22c55e">' + t.deliveryRate + '%</div><div class="stat-label">Taxa de entrega</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#8b5cf6">' + t.openRate + '%</div><div class="stat-label">Taxa de abertura</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#ef4444">' + t.bounceRate + '%</div><div class="stat-label">Taxa de bounce</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#eab308">' + t.complaintRate + '%</div><div class="stat-label">Reclamacoes</div></div>' +
+    '<div class="stat"><div class="stat-value">' + t.opened + '</div><div class="stat-label">Aberturas</div></div>';
+}
+
+function renderCampaignBreakdowns(stats) {
+  const s = stats.bySequence;
+  document.getElementById('campaign-by-sequence').innerHTML =
+    '<div class="table-wrap"><table><thead><tr><th>Sequencia</th><th>Enviados</th><th>Entregues</th><th>Abertos</th></tr></thead><tbody>' +
+    '<tr><td>V1 (Primeiro Contato)</td><td>' + s.v1.sent + '</td><td>' + s.v1.delivered + '</td><td>' + s.v1.opened + '</td></tr>' +
+    '<tr><td>V2 (Remarketing)</td><td>' + s.v2.sent + '</td><td>' + s.v2.delivered + '</td><td>' + s.v2.opened + '</td></tr>' +
+    '</tbody></table></div>';
+
+  const c = stats.byCategory;
+  document.getElementById('campaign-by-category').innerHTML =
+    '<div class="table-wrap"><table><thead><tr><th>Categoria</th><th>Enviados</th></tr></thead><tbody>' +
+    '<tr><td><span class="badge badge-blue">Empresa</span></td><td>' + c.empresa.sent + '</td></tr>' +
+    '<tr><td><span class="badge badge-green">Contabilidade</span></td><td>' + c.contabilidade.sent + '</td></tr>' +
+    '</tbody></table></div>';
+}
+
+async function runCampaignNow() {
+  if (!confirm('Executar a campanha diaria agora? Isso enviara emails para leads elegiveis dentro do limite de 100/dia.')) return;
+  try {
+    await apiPost('/api/email/campaign/run-now', {});
+    showToast('Campanha iniciada! Atualize em alguns minutos para ver os resultados.');
+    setTimeout(() => { campaignLoaded = false; loadCampaign(); }, 15000);
+  } catch(e) { showToast('Erro: ' + e.message, true); }
 }
 
 // ============ INIT ============
