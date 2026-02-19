@@ -334,38 +334,47 @@ async function executeCampaign(): Promise<CampaignResult> {
 }
 
 // ============ SCHEDULER ============
+// Runs daily at 09:00 BRT (Brasília, UTC-3 = 12:00 UTC)
 
-let campaignTimer: ReturnType<typeof setInterval> | null = null;
+let campaignTimer: ReturnType<typeof setTimeout> | null = null;
+
+function msUntilNext9amBRT(): number {
+  const now = new Date();
+  // Next 9:00 BRT = 12:00 UTC
+  const target = new Date(now);
+  target.setUTCHours(12, 0, 0, 0);
+  // If already past 12:00 UTC today, schedule for tomorrow
+  if (now.getTime() >= target.getTime()) {
+    target.setUTCDate(target.getUTCDate() + 1);
+  }
+  return target.getTime() - now.getTime();
+}
+
+function scheduleNextRun(): void {
+  const ms = msUntilNext9amBRT();
+  const hours = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  logger.info(`Next campaign scheduled in ${hours}h ${mins}m (09:00 BRT)`);
+
+  campaignTimer = setTimeout(async () => {
+    try {
+      await runDailyEmailCampaign();
+    } catch (err: any) {
+      logger.error(`Campaign scheduler error: ${err.message}`);
+    }
+    // After running, schedule the next day
+    scheduleNextRun();
+  }, ms);
+}
 
 export function startDailyCampaignScheduler(): void {
-  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-
-  // First run 5 minutes after startup
-  setTimeout(async () => {
-    try {
-      await runDailyEmailCampaign();
-    } catch (err: any) {
-      logger.error(`Campaign scheduler error: ${err.message}`);
-    }
-  }, 5 * 60 * 1000);
-
-  // Then repeat every 24h
-  campaignTimer = setInterval(async () => {
-    try {
-      await runDailyEmailCampaign();
-    } catch (err: any) {
-      logger.error(`Campaign scheduler error: ${err.message}`);
-    }
-  }, TWENTY_FOUR_HOURS);
-
-  logger.info(
-    "Daily email campaign scheduler started (first run in 5min, then every 24h)"
-  );
+  scheduleNextRun();
+  logger.info("Daily email campaign scheduler started (runs at 09:00 BRT)");
 }
 
 export function stopDailyCampaignScheduler(): void {
   if (campaignTimer) {
-    clearInterval(campaignTimer);
+    clearTimeout(campaignTimer);
     campaignTimer = null;
   }
 }
