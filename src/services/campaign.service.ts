@@ -240,14 +240,19 @@ async function executeCampaign(): Promise<CampaignResult> {
   for (const lead of v2Candidates) {
     if (remainingBudget <= 0) break;
 
-    const template =
-      lead.categoria === "contabilidade" ? contabV2 : empresaV2;
-    const success = await sendCampaignEmail(lead, template, 2);
+    try {
+      const template =
+        lead.categoria === "contabilidade" ? contabV2 : empresaV2;
+      const success = await sendCampaignEmail(lead, template, 2);
 
-    if (success) {
-      v2Sent++;
-      remainingBudget--;
-    } else {
+      if (success) {
+        v2Sent++;
+        remainingBudget--;
+      } else {
+        v2Failed++;
+      }
+    } catch (err: any) {
+      logger.error(`Campaign V2 error for ${lead.email}: ${err.message}`);
       v2Failed++;
     }
 
@@ -294,11 +299,16 @@ async function executeCampaign(): Promise<CampaignResult> {
 
     for (const lead of v1Empresas) {
       if (remainingBudget <= 0) break;
-      const success = await sendCampaignEmail(lead, empresaV1, 1);
-      if (success) {
-        v1Sent++;
-        remainingBudget--;
-      } else {
+      try {
+        const success = await sendCampaignEmail(lead, empresaV1, 1);
+        if (success) {
+          v1Sent++;
+          remainingBudget--;
+        } else {
+          v1Failed++;
+        }
+      } catch (err: any) {
+        logger.error(`Campaign V1 empresa error for ${lead.email}: ${err.message}`);
         v1Failed++;
       }
       await new Promise((r) => setTimeout(r, 1000));
@@ -306,11 +316,16 @@ async function executeCampaign(): Promise<CampaignResult> {
 
     for (const lead of v1Contabs) {
       if (remainingBudget <= 0) break;
-      const success = await sendCampaignEmail(lead, contabV1, 1);
-      if (success) {
-        v1Sent++;
-        remainingBudget--;
-      } else {
+      try {
+        const success = await sendCampaignEmail(lead, contabV1, 1);
+        if (success) {
+          v1Sent++;
+          remainingBudget--;
+        } else {
+          v1Failed++;
+        }
+      } catch (err: any) {
+        logger.error(`Campaign V1 contab error for ${lead.email}: ${err.message}`);
         v1Failed++;
       }
       await new Promise((r) => setTimeout(r, 1000));

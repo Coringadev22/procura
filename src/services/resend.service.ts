@@ -154,27 +154,36 @@ export async function sendCampaignEmail(
 ): Promise<boolean> {
   if (!lead.email) return false;
 
-  const vars: Record<string, string> = {
-    empresa: lead.razaoSocial || lead.nomeFantasia || "",
-    cnpj: lead.cnpj,
-    email: lead.email,
-    contato: lead.razaoSocial || "",
-    valor: lead.valorHomologado
-      ? `R$ ${lead.valorHomologado.toLocaleString("pt-BR")}`
-      : "",
-    cidade: lead.municipio || "",
-    uf: lead.uf || "",
-  };
+  try {
+    const vars: Record<string, string> = {
+      empresa: lead.razaoSocial || lead.nomeFantasia || "",
+      cnpj: lead.cnpj,
+      email: lead.email,
+      contato: lead.razaoSocial || "",
+      valor: lead.valorHomologado
+        ? `R$ ${lead.valorHomologado.toLocaleString("pt-BR")}`
+        : "",
+      cidade: lead.municipio || "",
+      uf: lead.uf || "",
+    };
 
-  const result = await sendEmail(template.id, lead.email, lead.cnpj, vars);
+    const result = await sendEmail(template.id, lead.email, lead.cnpj, vars);
 
-  if (result.success && result.messageId) {
-    // Tag the log entry with the campaign sequence
-    await db
-      .update(emailSendLog)
-      .set({ emailSequence: sequence })
-      .where(eq(emailSendLog.resendMessageId, result.messageId));
+    if (result.success && result.messageId) {
+      // Tag the log entry with the campaign sequence
+      try {
+        await db
+          .update(emailSendLog)
+          .set({ emailSequence: sequence })
+          .where(eq(emailSendLog.resendMessageId, result.messageId));
+      } catch (tagErr: any) {
+        logger.error(`Campaign: Failed to tag sequence for ${lead.email}: ${tagErr.message}`);
+      }
+    }
+
+    return result.success;
+  } catch (err: any) {
+    logger.error(`Campaign: Unexpected error sending to ${lead.email}: ${err.message}`);
+    return false;
   }
-
-  return result.success;
 }
