@@ -12,6 +12,7 @@ import { runEmailSearch } from "./email-search.service.js";
 import { classifyLead } from "../utils/email-category.js";
 import { getSource } from "./data-sources/index.js";
 import { logger } from "../utils/logger.js";
+import { mergePhones, isMobilePhone, parsePhoneList } from "../utils/phone.js";
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
 
@@ -344,12 +345,17 @@ export async function executeJob(jobId: number): Promise<void> {
         // Classify using full analysis (email + CNAE + razao social)
         const categoria = classifyLead(r.email, r.cnaePrincipal, r.empresa);
 
+        const normalizedPhones = mergePhones(r.telefones || null);
+        const hasMobile = normalizedPhones
+          ? parsePhoneList(normalizedPhones).some(isMobilePhone)
+          : false;
+
         await db.insert(leads).values({
           cnpj,
           razaoSocial: r.empresa || null,
           nomeFantasia: r.nomeFantasia || null,
           email: r.email?.toLowerCase() || null,
-          telefones: r.telefones || null,
+          telefones: normalizedPhones,
           municipio: r.municipio || null,
           uf: r.uf || job.searchUf || null,
           cnaePrincipal: r.cnaePrincipal || null,
@@ -357,6 +363,7 @@ export async function executeJob(jobId: number): Promise<void> {
           fonte: activeFonte,
           valorHomologado: r.valorNum,
           categoria,
+          temCelular: hasMobile,
         });
         leadsAdded++;
       }

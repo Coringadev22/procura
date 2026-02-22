@@ -14,6 +14,9 @@ import { automationRoutes } from "./routes/automation.routes.js";
 import { leadsRoutes } from "./routes/leads.routes.js";
 import { startAutomationScheduler, cancelAllJobs } from "./services/automation.service.js";
 import { seedCampaignTemplates, startDailyCampaignScheduler, stopDailyCampaignScheduler } from "./services/campaign.service.js";
+import { whatsappRoutes } from "./routes/whatsapp.routes.js";
+import { initializeInstance } from "./services/whatsapp.service.js";
+import { startDailyWhatsAppScheduler, stopDailyWhatsAppScheduler } from "./services/whatsapp-campaign.service.js";
 
 const app = Fastify({
   logger: false,
@@ -36,6 +39,7 @@ await app.register(buscaEmailsRoutes);
 await app.register(resendRoutes);
 await app.register(automationRoutes);
 await app.register(leadsRoutes);
+await app.register(whatsappRoutes);
 await app.register(dashboardRoutes);
 
 // Global error handler
@@ -54,6 +58,12 @@ try {
   await startAutomationScheduler();
   await seedCampaignTemplates();
   startDailyCampaignScheduler();
+
+  // WhatsApp (only if configured)
+  if (env.WHATSAPP_ENABLED) {
+    await initializeInstance();
+    startDailyWhatsAppScheduler();
+  }
 
   logger.info(`Servidor rodando em http://localhost:${env.PORT}`);
   logger.info(`Dashboard visual: http://localhost:${env.PORT}/`);
@@ -75,10 +85,12 @@ try {
 process.on("SIGINT", () => {
   cancelAllJobs();
   stopDailyCampaignScheduler();
+  stopDailyWhatsAppScheduler();
   process.exit(0);
 });
 process.on("SIGTERM", () => {
   cancelAllJobs();
   stopDailyCampaignScheduler();
+  stopDailyWhatsAppScheduler();
   process.exit(0);
 });

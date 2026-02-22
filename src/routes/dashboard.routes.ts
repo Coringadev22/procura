@@ -338,6 +338,7 @@ const HTML = `<!DOCTYPE html>
         <div class="sidebar-section">Comunicacao</div>
         <button class="nav-item" data-tab="email" data-active-class="active-purple" onclick="switchTab('email')"><span class="nav-icon">&#9993;</span> Email</button>
         <button class="nav-item" data-tab="campanha" data-active-class="active-green" onclick="switchTab('campanha')"><span class="nav-icon">&#128640;</span> Campanha</button>
+        <button class="nav-item" data-tab="whatsapp" data-active-class="active-green" onclick="switchTab('whatsapp')"><span class="nav-icon">&#128172;</span> WhatsApp</button>
         <button class="nav-item" data-tab="automacao" data-active-class="active-amber" onclick="switchTab('automacao')"><span class="nav-icon">&#9889;</span> Automacao</button>
       </nav>
       <div class="sidebar-footer">v3.1 — Dados do PNCP</div>
@@ -704,6 +705,48 @@ const HTML = `<!DOCTYPE html>
           <h2>Por Categoria</h2>
           <div id="campaign-by-category"><div style="color:#64748b;font-size:13px;padding:8px">Carregando...</div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ============ WHATSAPP ============ -->
+    <div class="panel" id="panel-whatsapp">
+      <div class="info-box" style="border-left-color:#25d366">
+        <strong>WhatsApp via Evolution API:</strong> Envia mensagens automaticas para leads com celular. V1 primeiro contato 1-2 dias apos email, V2 remarketing apos 7 dias. Limite de 50 msgs/dia com delay de 3s. Leads podem responder SAIR para opt-out.
+      </div>
+
+      <div class="stats" id="wa-status">
+        <div class="stat"><div class="stat-value">-</div><div class="stat-label">Carregando...</div></div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Conexao WhatsApp</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" style="background:#25d366;color:#fff" onclick="loadWaQr()">Gerar QR Code</button>
+            <button class="btn btn-green btn-sm" onclick="runWaCampaignNow()">Executar Campanha</button>
+          </div>
+        </div>
+        <div id="wa-qr-area" style="display:none;text-align:center;padding:20px;background:#0f172a;border-radius:8px;margin-bottom:12px">
+          <p style="color:#94a3b8;font-size:13px;margin-bottom:10px">Escaneie o QR Code com o WhatsApp:</p>
+          <div id="wa-qr-img"></div>
+        </div>
+        <div id="wa-pipeline"><div style="color:#64748b;font-size:13px;padding:8px">Carregando pipeline...</div></div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
+        <h2>Analitica WhatsApp</h2>
+        <div id="wa-analytics" class="stats" style="margin-top:12px">
+          <div class="stat"><div class="stat-value">-</div><div class="stat-label">Carregando...</div></div>
+        </div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
+        <h2>Teste de Envio</h2>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="text" id="wa-test-phone" placeholder="+5511999998888" style="flex:1;padding:8px 12px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#f8fafc;font-size:14px">
+          <button class="btn btn-sm" style="background:#25d366;color:#fff" onclick="sendWaTest()">Enviar Teste</button>
+        </div>
+        <div id="wa-test-result" style="margin-top:8px;font-size:13px;color:#64748b"></div>
       </div>
     </div>
 
@@ -1201,6 +1244,7 @@ function switchTab(tabName) {
   if (tabName === 'licitacoes' && !licLoaded) { licLoaded = true; licPage = 1; searchLicitacoes(); }
   if (tabName === 'email' && !emailLoaded) { emailLoaded = true; loadEmailStatus(); }
   if (tabName === 'campanha' && !campaignLoaded) { campaignLoaded = true; loadCampaign(); }
+  if (tabName === 'whatsapp' && !waLoaded) { waLoaded = true; loadWhatsApp(); }
   if (tabName === 'automacao' && !autoLoaded) { autoLoaded = true; loadAutomacao(); }
 }
 
@@ -2334,6 +2378,117 @@ async function runCampaignNow() {
     showToast('Campanha iniciada! Atualize em alguns minutos para ver os resultados.');
     setTimeout(() => { campaignLoaded = false; loadCampaign(); }, 15000);
   } catch(e) { showToast('Erro: ' + e.message, true); }
+}
+
+// ============ WHATSAPP ============
+let waLoaded = false;
+
+async function loadWhatsApp() {
+  try {
+    const [status, stats, pipeline] = await Promise.all([
+      apiFetch('/api/whatsapp/status'),
+      apiFetch('/api/whatsapp/campaign/stats'),
+      apiFetch('/api/whatsapp/campaign/pipeline'),
+    ]);
+    renderWaStatus(status, stats);
+    renderWaPipeline(pipeline);
+    renderWaAnalytics(stats);
+  } catch(e) {
+    document.getElementById('wa-status').innerHTML = '<div class="stat"><div class="stat-value" style="color:#ef4444">Erro</div><div class="stat-label">' + e.message + '</div></div>';
+  }
+}
+
+function renderWaStatus(status, stats) {
+  const el = document.getElementById('wa-status');
+  const connColor = status.connected ? '#22c55e' : '#ef4444';
+  const connText = status.connected ? 'Conectado' : (status.enabled ? 'Desconectado' : 'Nao Configurado');
+  el.innerHTML = \`
+    <div class="stat"><div class="stat-value" style="color:\${connColor}">\${connText}</div><div class="stat-label">Status</div></div>
+    <div class="stat"><div class="stat-value">\${stats.totals.sentToday || 0}</div><div class="stat-label">Enviados Hoje</div></div>
+    <div class="stat"><div class="stat-value">\${stats.remainingToday || 0}</div><div class="stat-label">Restante</div></div>
+    <div class="stat"><div class="stat-value">\${status.leadsWithMobile || 0}</div><div class="stat-label">Leads c/ Celular</div></div>
+    <div class="stat"><div class="stat-value">\${stats.dailyLimit || 50}</div><div class="stat-label">Limite Diario</div></div>
+  \`;
+}
+
+function renderWaPipeline(p) {
+  const el = document.getElementById('wa-pipeline');
+  el.innerHTML = \`
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px;background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid #25d366">
+        <div style="font-size:20px;font-weight:700;color:#25d366">\${p.totalWithMobile || 0}</div>
+        <div style="font-size:11px;color:#94a3b8">Total com Celular</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid #3b82f6">
+        <div style="font-size:20px;font-weight:700;color:#60a5fa">\${p.eligibleForV1 || 0}</div>
+        <div style="font-size:11px;color:#94a3b8">Elegiveis V1</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid #f59e0b">
+        <div style="font-size:20px;font-weight:700;color:#fbbf24">\${p.waitingForV2 || 0}</div>
+        <div style="font-size:11px;color:#94a3b8">Aguardando V2</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid #22c55e">
+        <div style="font-size:20px;font-weight:700;color:#4ade80">\${p.fullyProcessed || 0}</div>
+        <div style="font-size:11px;color:#94a3b8">Concluidos</div>
+      </div>
+    </div>
+  \`;
+}
+
+function renderWaAnalytics(stats) {
+  const el = document.getElementById('wa-analytics');
+  const t = stats.totals;
+  el.innerHTML = \`
+    <div class="stat"><div class="stat-value">\${t.sent || 0}</div><div class="stat-label">Total Enviados</div></div>
+    <div class="stat"><div class="stat-value">\${t.delivered || 0}</div><div class="stat-label">Entregues</div></div>
+    <div class="stat"><div class="stat-value">\${t.read || 0}</div><div class="stat-label">Lidos</div></div>
+    <div class="stat"><div class="stat-value">\${t.failed || 0}</div><div class="stat-label">Falhas</div></div>
+    <div class="stat"><div class="stat-value">\${t.deliveryRate}%</div><div class="stat-label">Taxa Entrega</div></div>
+    <div class="stat"><div class="stat-value">\${t.readRate}%</div><div class="stat-label">Taxa Leitura</div></div>
+  \`;
+}
+
+async function loadWaQr() {
+  const area = document.getElementById('wa-qr-area');
+  const img = document.getElementById('wa-qr-img');
+  area.style.display = 'block';
+  img.innerHTML = '<div style="color:#94a3b8;font-size:13px">Gerando QR code...</div>';
+  try {
+    const data = await apiFetch('/api/whatsapp/qr');
+    if (data.base64) {
+      img.innerHTML = '<img src="' + data.base64 + '" style="max-width:280px;border-radius:8px">';
+    } else if (data.state === 'open') {
+      img.innerHTML = '<div style="color:#22c55e;font-size:16px;font-weight:600">Ja conectado!</div>';
+    } else {
+      img.innerHTML = '<div style="color:#f59e0b;font-size:13px">' + (data.error || 'QR nao disponivel. Configure EVOLUTION_API_URL.') + '</div>';
+    }
+  } catch(e) {
+    img.innerHTML = '<div style="color:#ef4444;font-size:13px">Erro: ' + e.message + '</div>';
+  }
+}
+
+async function runWaCampaignNow() {
+  if (!confirm('Executar campanha WhatsApp agora? Isso enviara mensagens para leads com celular dentro do limite de 50/dia.')) return;
+  try {
+    await apiPost('/api/whatsapp/campaign/run', {});
+    showToast('Campanha WhatsApp iniciada! Atualize em alguns minutos.');
+    setTimeout(() => { waLoaded = false; loadWhatsApp(); }, 20000);
+  } catch(e) { showToast('Erro: ' + e.message, true); }
+}
+
+async function sendWaTest() {
+  const phone = document.getElementById('wa-test-phone').value.trim();
+  const result = document.getElementById('wa-test-result');
+  if (!phone) { result.innerHTML = '<span style="color:#f59e0b">Insira um numero</span>'; return; }
+  result.innerHTML = '<span style="color:#64748b">Enviando...</span>';
+  try {
+    const data = await apiPost('/api/whatsapp/send-test', { phone });
+    if (data.success) {
+      result.innerHTML = '<span style="color:#22c55e">Mensagem enviada! ID: ' + (data.messageId || '-') + '</span>';
+    } else {
+      result.innerHTML = '<span style="color:#ef4444">Falha: ' + (data.error || 'erro desconhecido') + '</span>';
+    }
+  } catch(e) { result.innerHTML = '<span style="color:#ef4444">Erro: ' + e.message + '</span>'; }
 }
 
 // ============ INIT ============

@@ -3,6 +3,7 @@ import { eq, like, and, isNotNull, sql } from "drizzle-orm";
 import { db } from "../config/database.js";
 import { leads } from "../db/schema.js";
 import { classifyLead } from "../utils/email-category.js";
+import { mergePhones, isMobilePhone, parsePhoneList } from "../utils/phone.js";
 
 export async function leadsRoutes(app: FastifyInstance) {
   // List leads (with optional filters)
@@ -74,12 +75,17 @@ export async function leadsRoutes(app: FastifyInstance) {
       }
     }
 
+    const normalizedPhones = mergePhones(body.telefones || null);
+    const hasMobile = normalizedPhones
+      ? parsePhoneList(normalizedPhones).some(isMobilePhone)
+      : false;
+
     const [result] = await db.insert(leads).values({
       cnpj,
       razaoSocial: body.razaoSocial || null,
       nomeFantasia: body.nomeFantasia || null,
       email: body.email?.toLowerCase() || null,
-      telefones: body.telefones || null,
+      telefones: normalizedPhones,
       municipio: body.municipio || null,
       uf: body.uf || null,
       cnaePrincipal: body.cnaePrincipal || null,
@@ -87,6 +93,7 @@ export async function leadsRoutes(app: FastifyInstance) {
       fonte: body.fonte || null,
       valorHomologado: body.valorHomologado || null,
       categoria: body.categoria || "empresa",
+      temCelular: hasMobile,
     }).returning({ id: leads.id });
 
     return { success: true, id: result.id };
@@ -127,12 +134,17 @@ export async function leadsRoutes(app: FastifyInstance) {
         if (byEmail) { skipped++; continue; }
       }
 
+      const nPhones = mergePhones(item.telefones || null);
+      const hasMob = nPhones
+        ? parsePhoneList(nPhones).some(isMobilePhone)
+        : false;
+
       await db.insert(leads).values({
         cnpj,
         razaoSocial: item.razaoSocial || null,
         nomeFantasia: item.nomeFantasia || null,
         email: item.email?.toLowerCase() || null,
-        telefones: item.telefones || null,
+        telefones: nPhones,
         municipio: item.municipio || null,
         uf: item.uf || null,
         cnaePrincipal: item.cnaePrincipal || null,
@@ -140,6 +152,7 @@ export async function leadsRoutes(app: FastifyInstance) {
         fonte: item.fonte || null,
         valorHomologado: item.valorHomologado || null,
         categoria: item.categoria || "empresa",
+        temCelular: hasMob,
       });
       added++;
     }
@@ -203,5 +216,65 @@ export async function leadsRoutes(app: FastifyInstance) {
     }
 
     return { total: allLeads.length, reclassified, changes };
+  });
+
+  // Re-enrich leads without phones (or normalize existing)
+  app.post("/api/leads/re-enrich-phones", async () => {
+    const { lookupCnpj } = await import("../services/cnpj-lookup.service.js");
+
+    // Get leads missing phones or with un-normalized phones
+    const allLeads = await db.select().from(leads);
+    const needsEnrich = allLeads.filter((l) => !l.telefones || l.telefones.trim() === "");
+
+    let enriched = 0;
+    let normalized = 0;
+    let failed = 0;
+
+    // First: normalize leads that already have phones but need temCelular flag
+    const hasPhones = allLeads.filter((l) => l.telefones && l.telefones.trim() !== "");
+    for (const lead of hasPhones) {
+      const nPhones = mergePhones(lead.telefones);
+      const hasMob = nPhones
+        ? parsePhoneList(nPhones).some(isMobilePhone)
+        : false;
+      if (nPhones !== lead.telefones || lead.temCelular !== hasMob) {
+        await db.update(leads)
+          .set({ telefones: nPhones, temCelular: hasMob })
+          .where(eq(leads.id, lead.id));
+        normalized++;
+      }
+    }
+
+    // Then: re-enrich leads without phones (rate limited by CNPJ lookup queues)
+    for (const lead of needsEnrich) {
+      try {
+        const data = await lookupCnpj(lead.cnpj);
+        if (data.telefones) {
+          const nPhones = mergePhones(data.telefones);
+          const hasMob = nPhones
+            ? parsePhoneList(nPhones).some(isMobilePhone)
+            : false;
+          await db.update(leads)
+            .set({
+              telefones: nPhones,
+              temCelular: hasMob,
+              ...(data.email && !lead.email ? { email: data.email.toLowerCase() } : {}),
+            })
+            .where(eq(leads.id, lead.id));
+          enriched++;
+        }
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    return {
+      total: allLeads.length,
+      withPhones: hasPhones.length,
+      normalized,
+      needsEnrich: needsEnrich.length,
+      enriched,
+      failed,
+    };
   });
 }

@@ -195,6 +195,9 @@ export const leads = pgTable("leads", {
   categoria: text("categoria").notNull().default("empresa"),
   emailSentAt: text("email_sent_at"),
   emailSentCount: integer("email_sent_count").notNull().default(0),
+  temCelular: boolean("tem_celular").notNull().default(false),
+  whatsappSentAt: text("whatsapp_sent_at"),
+  whatsappSentCount: integer("whatsapp_sent_count").notNull().default(0),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -214,6 +217,26 @@ export const inboundEmails = pgTable("inbound_emails", {
   receivedAt: text("received_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
+});
+
+// WhatsApp send log
+export const whatsappSendLog = pgTable("whatsapp_send_log", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id),
+  recipientPhone: text("recipient_phone").notNull(),
+  recipientCnpj: text("recipient_cnpj"),
+  recipientName: text("recipient_name"),
+  templateName: text("template_name").notNull(),
+  messageText: text("message_text").notNull(),
+  messageSequence: integer("message_sequence"),
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  externalMessageId: text("external_message_id"),
+  sentAt: text("sent_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deliveredAt: text("delivered_at"),
+  readAt: text("read_at"),
 });
 
 // Automation run log

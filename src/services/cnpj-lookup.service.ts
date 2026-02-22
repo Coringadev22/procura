@@ -7,6 +7,7 @@ import { logger } from "../utils/logger.js";
 import { cleanCnpj } from "../utils/cnpj.js";
 import { fetchWithRetry } from "../utils/retry.js";
 import { detectEmailCategory } from "../utils/email-category.js";
+import { normalizePhone, mergePhones, parsePhoneList } from "../utils/phone.js";
 import type {
   CnpjData,
   BrasilApiCnpjResponse,
@@ -14,6 +15,11 @@ import type {
   CnpjWsResponse,
   ReceitaWsResponse,
 } from "../types/cnpj.types.js";
+
+interface SecondaryData {
+  email: string | null;
+  phones: string[];
+}
 
 // Rate-limited queues for external APIs
 // BrasilAPI: no strict rate limit, fast for company data (no emails)
@@ -88,53 +94,72 @@ async function fetchBrasilApi(cnpj: string): Promise<CnpjData | null> {
   }
 }
 
-// Email-only fetchers for each provider
-async function fetchCnpjaEmail(cnpj: string): Promise<string | null> {
+// Data fetchers for each provider (email + phones)
+async function fetchCnpjaData(cnpj: string): Promise<SecondaryData> {
   try {
     const res = await fetchWithRetry(
       `https://open.cnpja.com/office/${cnpj}`,
       undefined,
       1
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { email: null, phones: [] };
     const data = (await res.json()) as CnpjaResponse;
-    return data.emails?.[0]?.address || null;
+    const email = data.emails?.[0]?.address || null;
+    const phones = (data.phones || [])
+      .map((p) => normalizePhone(`${p.area}${p.number}`))
+      .filter((p): p is string => p !== null);
+    return { email, phones };
   } catch (err) {
     logger.error(`CNPJá error for ${cnpj}: ${err}`);
-    return null;
+    return { email: null, phones: [] };
   }
 }
 
-async function fetchCnpjWsEmail(cnpj: string): Promise<string | null> {
+async function fetchCnpjWsData(cnpj: string): Promise<SecondaryData> {
   try {
     const res = await fetchWithRetry(
       `https://publica.cnpj.ws/cnpj/${cnpj}`,
       undefined,
       1
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { email: null, phones: [] };
     const data = (await res.json()) as CnpjWsResponse;
-    return data.estabelecimento?.email || null;
+    const email = data.estabelecimento?.email || null;
+    const phones: string[] = [];
+    const est = data.estabelecimento;
+    if (est?.ddd1 && est?.telefone1) {
+      const n = normalizePhone(`${est.ddd1}${est.telefone1}`);
+      if (n) phones.push(n);
+    }
+    if (est?.ddd2 && est?.telefone2) {
+      const n = normalizePhone(`${est.ddd2}${est.telefone2}`);
+      if (n) phones.push(n);
+    }
+    return { email, phones };
   } catch (err) {
     logger.error(`CNPJ.ws error for ${cnpj}: ${err}`);
-    return null;
+    return { email: null, phones: [] };
   }
 }
 
-async function fetchReceitaWsEmail(cnpj: string): Promise<string | null> {
+async function fetchReceitaWsData(cnpj: string): Promise<SecondaryData> {
   try {
     const res = await fetchWithRetry(
       `https://receitaws.com.br/v1/cnpj/${cnpj}`,
       undefined,
       1
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { email: null, phones: [] };
     const data = (await res.json()) as ReceitaWsResponse;
-    if (data.status === "ERROR") return null;
-    return data.email || null;
+    if (data.status === "ERROR") return { email: null, phones: [] };
+    const email = data.email || null;
+    const phones = data.telefone
+      ? parsePhoneList(data.telefone).filter((p): p is string => p !== null)
+      : [];
+    return { email, phones };
   } catch (err) {
     logger.error(`ReceitaWS error for ${cnpj}: ${err}`);
-    return null;
+    return { email: null, phones: [] };
   }
 }
 
@@ -232,37 +257,45 @@ export async function lookupCnpj(rawCnpj: string, skipSlowFallback = false): Pro
     return result;
   }
 
-  // 3. Get email from CNPJá (best quality - empresa emails)
+  // 3. Get email + phones from CNPJá (best quality - empresa emails)
+  const allSecondaryPhones: string[][] = [];
   let primaryEmail: string | null = null;
-  if (!result.email) {
-    const email = await cnpjaQueue.add(() => fetchCnpjaEmail(cnpj));
-    if (email) {
-      result.email = email;
+
+  const cnpjaData = await cnpjaQueue.add(() => fetchCnpjaData(cnpj));
+  if (cnpjaData) {
+    if (cnpjaData.phones.length > 0) allSecondaryPhones.push(cnpjaData.phones);
+    if (!result.email && cnpjaData.email) {
+      result.email = cnpjaData.email;
       result.emailSource = "cnpja";
-      primaryEmail = email;
+      primaryEmail = cnpjaData.email;
     }
   }
 
   // 4. Fallback to CNPJ.ws (good quality - empresa emails)
-  if (!result.email) {
-    const email = await cnpjWsQueue.add(() => fetchCnpjWsEmail(cnpj));
-    if (email) {
-      result.email = email;
+  const cnpjWsData = await cnpjWsQueue.add(() => fetchCnpjWsData(cnpj));
+  if (cnpjWsData) {
+    if (cnpjWsData.phones.length > 0) allSecondaryPhones.push(cnpjWsData.phones);
+    if (!result.email && cnpjWsData.email) {
+      result.email = cnpjWsData.email;
       result.emailSource = "cnpjws";
-      primaryEmail = email;
+      primaryEmail = cnpjWsData.email;
     }
   }
 
   // 5. Last resort: ReceitaWS (often returns accounting firm emails)
-  if (!result.email) {
-    const email = await receitawsQueue.add(() => fetchReceitaWsEmail(cnpj));
-    if (email) {
-      result.email = email;
+  const receitaData = await receitawsQueue.add(() => fetchReceitaWsData(cnpj));
+  if (receitaData) {
+    if (receitaData.phones.length > 0) allSecondaryPhones.push(receitaData.phones);
+    if (!result.email && receitaData.email) {
+      result.email = receitaData.email;
       result.emailSource = "receitaws";
     }
   }
 
-  // 6. Classify email category using 3-layer detection
+  // 6. Merge phones from all sources
+  result.telefones = mergePhones(result.telefones, ...allSecondaryPhones);
+
+  // 7. Classify email category using 3-layer detection
   result.emailCategory = detectEmailCategory(result.email, result.emailSource, primaryEmail);
 
   await upsertCache(cnpj, result, cached);
@@ -379,28 +412,34 @@ export async function lookupMultipleCnpjs(
     return results;
   }
 
-  // Step 3: PASS 1 — Get emails from CNPJá + CNPJ.ws (empresa quality)
+  // Step 3: PASS 1 — Get emails + phones from CNPJá + CNPJ.ws (empresa quality)
   const needsEmail = needsLookup.filter((cnpj) => !brasilData.get(cnpj)?.email);
 
   logger.info(`Pass 1: ${needsEmail.length} CNPJs need email (CNPJá + CNPJ.ws)`);
 
   const emailResults = new Map<string, { email: string; source: CnpjData["emailSource"] }>();
+  const phoneResults = new Map<string, string[]>();
 
   const pass1Lookups = needsEmail.map(async (cnpj, index) => {
     const provider = index % 2; // Only 2 providers in pass 1
-    let email: string | null = null;
+    let secondary: SecondaryData | undefined;
     let source: CnpjData["emailSource"] = "not_found";
 
     if (provider === 0) {
-      email = await cnpjaQueue.add(() => fetchCnpjaEmail(cnpj));
+      secondary = await cnpjaQueue.add(() => fetchCnpjaData(cnpj));
       source = "cnpja";
     } else {
-      email = await cnpjWsQueue.add(() => fetchCnpjWsEmail(cnpj));
+      secondary = await cnpjWsQueue.add(() => fetchCnpjWsData(cnpj));
       source = "cnpjws";
     }
 
-    if (email) {
-      emailResults.set(cnpj, { email, source });
+    if (secondary) {
+      if (secondary.email) {
+        emailResults.set(cnpj, { email: secondary.email, source });
+      }
+      if (secondary.phones.length > 0) {
+        phoneResults.set(cnpj, [...(phoneResults.get(cnpj) || []), ...secondary.phones]);
+      }
     }
   });
 
@@ -412,9 +451,14 @@ export async function lookupMultipleCnpjs(
   logger.info(`Pass 2: ${stillNoEmail.length} CNPJs still need email (ReceitaWS fallback)`);
 
   const pass2Lookups = stillNoEmail.map(async (cnpj) => {
-    const email = await receitawsQueue.add(() => fetchReceitaWsEmail(cnpj));
-    if (email) {
-      emailResults.set(cnpj, { email, source: "receitaws" });
+    const secondary = await receitawsQueue.add(() => fetchReceitaWsData(cnpj));
+    if (secondary) {
+      if (secondary.email) {
+        emailResults.set(cnpj, { email: secondary.email, source: "receitaws" });
+      }
+      if (secondary.phones.length > 0) {
+        phoneResults.set(cnpj, [...(phoneResults.get(cnpj) || []), ...secondary.phones]);
+      }
     }
   });
 
@@ -426,6 +470,12 @@ export async function lookupMultipleCnpjs(
     if (emailResult) {
       data.email = emailResult.email;
       data.emailSource = emailResult.source;
+    }
+
+    // Merge phones from secondary APIs
+    const extraPhones = phoneResults.get(cnpj);
+    if (extraPhones && extraPhones.length > 0) {
+      data.telefones = mergePhones(data.telefones, extraPhones);
     }
 
     // Classify using 3-layer detection
