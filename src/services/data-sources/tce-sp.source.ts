@@ -1,4 +1,5 @@
 import { lookupMultipleCnpjs } from "../cnpj-lookup.service.js";
+import { isValidCnpj } from "../../utils/cnpj.js";
 import { logger } from "../../utils/logger.js";
 import type { DataSource, DataSourceConfig, SourceResult } from "./types.js";
 
@@ -88,7 +89,7 @@ export class TceSpSource implements DataSource {
         for (const d of data) {
           if (!d.id_fornecedor) continue;
           const cnpj = extractCnpjFromId(d.id_fornecedor);
-          if (!cnpj) continue;
+          if (!cnpj || !isValidCnpj(cnpj)) continue;
 
           if (!cnpjMap.has(cnpj)) {
             cnpjMap.set(cnpj, {

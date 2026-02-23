@@ -277,4 +277,54 @@ export async function leadsRoutes(app: FastifyInstance) {
       failed,
     };
   });
+
+  // Re-enrich leads missing razaoSocial (fixes BrasilAPI failures)
+  app.post("/api/leads/re-enrich-names", async () => {
+    const { lookupCnpj } = await import("../services/cnpj-lookup.service.js");
+
+    const noName = await db.select().from(leads).where(
+      and(
+        sql`${leads.razaoSocial} IS NULL OR ${leads.razaoSocial} = ''`,
+        sql`length(${leads.cnpj}) = 14`
+      )
+    );
+
+    let fixed = 0;
+    let failed = 0;
+    let deleted = 0;
+
+    for (const lead of noName) {
+      try {
+        const data = await lookupCnpj(lead.cnpj);
+        if (data.razaoSocial) {
+          const updates: Record<string, any> = {
+            razaoSocial: data.razaoSocial,
+          };
+          if (data.nomeFantasia) updates.nomeFantasia = data.nomeFantasia;
+          if (data.email && !lead.email) updates.email = data.email.toLowerCase();
+          if (data.telefones && !lead.telefones) {
+            const nPhones = mergePhones(data.telefones);
+            updates.telefones = nPhones;
+            updates.temCelular = nPhones
+              ? parsePhoneList(nPhones).some(isMobilePhone)
+              : false;
+          }
+          if (data.municipio && !lead.municipio) updates.municipio = data.municipio;
+          if (data.uf && !lead.uf) updates.uf = data.uf;
+          if (data.cnaePrincipal && !lead.cnaePrincipal) updates.cnaePrincipal = data.cnaePrincipal;
+
+          await db.update(leads).set(updates).where(eq(leads.id, lead.id));
+          fixed++;
+        } else {
+          // CNPJ not found in any API - remove invalid lead
+          await db.delete(leads).where(eq(leads.id, lead.id));
+          deleted++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    return { needsFix: noName.length, fixed, deleted, failed };
+  });
 }

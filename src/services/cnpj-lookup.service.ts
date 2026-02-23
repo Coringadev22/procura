@@ -19,6 +19,11 @@ import type {
 interface SecondaryData {
   email: string | null;
   phones: string[];
+  razaoSocial?: string | null;
+  nomeFantasia?: string | null;
+  municipio?: string | null;
+  uf?: string | null;
+  cnaePrincipal?: string | null;
 }
 
 // Rate-limited queues for external APIs
@@ -108,7 +113,15 @@ async function fetchCnpjaData(cnpj: string): Promise<SecondaryData> {
     const phones = (data.phones || [])
       .map((p) => normalizePhone(`${p.area}${p.number}`))
       .filter((p): p is string => p !== null);
-    return { email, phones };
+    return {
+      email,
+      phones,
+      razaoSocial: data.company?.name || null,
+      nomeFantasia: data.alias || null,
+      municipio: data.address?.city || null,
+      uf: data.address?.state || null,
+      cnaePrincipal: data.mainActivity?.text || null,
+    };
   } catch (err) {
     logger.error(`CNPJá error for ${cnpj}: ${err}`);
     return { email: null, phones: [] };
@@ -135,7 +148,15 @@ async function fetchCnpjWsData(cnpj: string): Promise<SecondaryData> {
       const n = normalizePhone(`${est.ddd2}${est.telefone2}`);
       if (n) phones.push(n);
     }
-    return { email, phones };
+    return {
+      email,
+      phones,
+      razaoSocial: data.razao_social || null,
+      nomeFantasia: est?.nome_fantasia || null,
+      municipio: est?.cidade?.nome || null,
+      uf: est?.estado?.sigla || null,
+      cnaePrincipal: est?.atividade_principal?.descricao || null,
+    };
   } catch (err) {
     logger.error(`CNPJ.ws error for ${cnpj}: ${err}`);
     return { email: null, phones: [] };
@@ -156,7 +177,15 @@ async function fetchReceitaWsData(cnpj: string): Promise<SecondaryData> {
     const phones = data.telefone
       ? parsePhoneList(data.telefone).filter((p): p is string => p !== null)
       : [];
-    return { email, phones };
+    return {
+      email,
+      phones,
+      razaoSocial: data.nome || null,
+      nomeFantasia: data.fantasia || null,
+      municipio: data.municipio || null,
+      uf: data.uf || null,
+      cnaePrincipal: data.atividade_principal?.[0]?.text || null,
+    };
   } catch (err) {
     logger.error(`ReceitaWS error for ${cnpj}: ${err}`);
     return { email: null, phones: [] };
@@ -419,6 +448,7 @@ export async function lookupMultipleCnpjs(
 
   const emailResults = new Map<string, { email: string; source: CnpjData["emailSource"] }>();
   const phoneResults = new Map<string, string[]>();
+  const secondaryCompanyData = new Map<string, SecondaryData>();
 
   const pass1Lookups = needsEmail.map(async (cnpj, index) => {
     const provider = index % 2; // Only 2 providers in pass 1
@@ -440,6 +470,9 @@ export async function lookupMultipleCnpjs(
       if (secondary.phones.length > 0) {
         phoneResults.set(cnpj, [...(phoneResults.get(cnpj) || []), ...secondary.phones]);
       }
+      if (secondary.razaoSocial) {
+        secondaryCompanyData.set(cnpj, secondary);
+      }
     }
   });
 
@@ -459,6 +492,9 @@ export async function lookupMultipleCnpjs(
       if (secondary.phones.length > 0) {
         phoneResults.set(cnpj, [...(phoneResults.get(cnpj) || []), ...secondary.phones]);
       }
+      if (secondary.razaoSocial && !secondaryCompanyData.has(cnpj)) {
+        secondaryCompanyData.set(cnpj, secondary);
+      }
     }
   });
 
@@ -476,6 +512,16 @@ export async function lookupMultipleCnpjs(
     const extraPhones = phoneResults.get(cnpj);
     if (extraPhones && extraPhones.length > 0) {
       data.telefones = mergePhones(data.telefones, extraPhones);
+    }
+
+    // Fill missing company data from secondary APIs (fallback when BrasilAPI fails)
+    const secondaryData = secondaryCompanyData.get(cnpj);
+    if (secondaryData) {
+      if (!data.razaoSocial && secondaryData.razaoSocial) data.razaoSocial = secondaryData.razaoSocial;
+      if (!data.nomeFantasia && secondaryData.nomeFantasia) data.nomeFantasia = secondaryData.nomeFantasia;
+      if (!data.municipio && secondaryData.municipio) data.municipio = secondaryData.municipio;
+      if (!data.uf && secondaryData.uf) data.uf = secondaryData.uf;
+      if (!data.cnaePrincipal && secondaryData.cnaePrincipal) data.cnaePrincipal = secondaryData.cnaePrincipal;
     }
 
     // Classify using 3-layer detection

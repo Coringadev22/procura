@@ -1,4 +1,5 @@
 import { lookupMultipleCnpjs } from "../cnpj-lookup.service.js";
+import { isValidCnpj } from "../../utils/cnpj.js";
 import { logger } from "../../utils/logger.js";
 import type { DataSource, DataSourceConfig, SourceResult } from "./types.js";
 
@@ -35,9 +36,9 @@ function isPfSearch(keyword: string): boolean {
 
 function extractCnpjs(text: string): string[] {
   const matches = text.match(CNPJ_REGEX) || [];
-  return [...new Set(matches.map((m) => m.replace(/\D/g, "")))].filter(
-    (c) => c.length === 14
-  );
+  return [...new Set(matches.map((m) => m.replace(/\D/g, "")))]
+    .filter((c) => c.length === 14)
+    .filter(isValidCnpj); // Validate check digits
 }
 
 function extractCpfs(text: string): string[] {
@@ -49,19 +50,17 @@ function extractCpfs(text: string): string[] {
 
 /** Extract names near CPFs in PAD context (best effort) */
 function extractNameNearCpf(text: string, cpf: string): string | null {
-  // Look for patterns like "Nome Completo, CPF 123.456.789-00" or "CPF 123... Nome"
   const cpfFormatted = cpf.replace(
     /(\d{3})(\d{3})(\d{3})(\d{2})/,
     "$1.$2.$3-$4"
   );
+  const escaped = cpfFormatted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const patterns = [
-    // "FULANO DE TAL, CPF nº 123.456.789-00"
     new RegExp(
-      `([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ\\s]{5,50}),?\\s*(?:CPF|cpf)\\s*(?:n[ºo°.]?\\s*)?${cpfFormatted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      `([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ\\s]{5,50}),?\\s*(?:CPF|cpf)\\s*(?:n[ºo°.]?\\s*)?${escaped}`,
     ),
-    // "CPF 123.456.789-00 - FULANO DE TAL"
     new RegExp(
-      `(?:CPF|cpf)\\s*(?:n[ºo°.]?\\s*)?${cpfFormatted.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[-–—]?\\s*([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ\\s]{5,50})`,
+      `(?:CPF|cpf)\\s*(?:n[ºo°.]?\\s*)?${escaped}\\s*[-–—]?\\s*([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ\\s]{5,50})`,
     ),
   ];
 
@@ -87,7 +86,7 @@ export class DiarioOficialSource implements DataSource {
     const params = new URLSearchParams({
       querystring: keyword,
       size: String(size),
-      excerpt_size: "1500",
+      excerpt_size: "2000",
       number_of_excerpts: "3",
       sort_by: "descending_date",
     });
@@ -101,6 +100,11 @@ export class DiarioOficialSource implements DataSource {
     }
     if (config.dataFinal) {
       params.set("published_until", config.dataFinal);
+    }
+
+    // Filter by state if provided (UF → IBGE territory_id prefix)
+    if (config.uf) {
+      // We can't filter by state directly, but we'll filter results after
     }
 
     const url = `${BASE_URL}/gazettes?${params}`;
@@ -120,20 +124,24 @@ export class DiarioOficialSource implements DataSource {
       throw new Error(`Querido Diário API indisponível: ${err.message}`);
     }
 
+    // Count unique states for diversity logging
+    const states = new Set(response.gazettes.map((g) => g.state_code));
     logger.info(
-      `Diário Oficial: ${response.total_gazettes} gazetas encontradas, processando ${response.gazettes.length}`
+      `Diário Oficial: ${response.total_gazettes} gazetas encontradas, processando ${response.gazettes.length} de ${states.size} estados (${[...states].join(",")})`
     );
 
     if (isPf) {
       return this.processPfLeads(response.gazettes);
     }
-    return this.processPjLeads(response.gazettes);
+    return this.processPjLeads(response.gazettes, config.uf);
   }
 
-  private async processPjLeads(gazettes: QdGazette[]): Promise<SourceResult[]> {
+  private async processPjLeads(gazettes: QdGazette[], ufFilter?: string): Promise<SourceResult[]> {
     const cnpjMap = new Map<string, SourceResult>();
 
     for (const gazette of gazettes) {
+      if (ufFilter && gazette.state_code !== ufFilter.toUpperCase()) continue;
+
       const fullText = gazette.excerpts.join("\n");
       const cnpjs = extractCnpjs(fullText);
 
@@ -148,6 +156,10 @@ export class DiarioOficialSource implements DataSource {
         }
       }
     }
+
+    logger.info(
+      `Diário Oficial PJ: ${cnpjMap.size} CNPJs válidos extraídos`
+    );
 
     // Enrich with CNPJ lookup
     const cnpjs = [...cnpjMap.keys()];
@@ -169,8 +181,17 @@ export class DiarioOficialSource implements DataSource {
       }
     }
 
-    logger.info(`Diário Oficial PJ: ${cnpjMap.size} leads extraídos`);
-    return [...cnpjMap.values()];
+    // Filter out leads without razaoSocial (invalid or unresolvable CNPJs)
+    const results = [...cnpjMap.values()].filter((r) => r.razaoSocial);
+    const filtered = cnpjMap.size - results.length;
+    if (filtered > 0) {
+      logger.info(
+        `Diário Oficial PJ: ${filtered} leads removidos (sem razão social após enriquecimento)`
+      );
+    }
+
+    logger.info(`Diário Oficial PJ: ${results.length} leads finais`);
+    return results;
   }
 
   private async processPfLeads(gazettes: QdGazette[]): Promise<SourceResult[]> {
@@ -185,7 +206,7 @@ export class DiarioOficialSource implements DataSource {
 
         const name = extractNameNearCpf(fullText, cpf);
         cpfMap.set(cpf, {
-          cnpj: cpf, // Use CPF in the cnpj field for dedup (leads table has unique cnpj)
+          cnpj: cpf,
           tipoPessoa: "PF",
           cpf,
           nomeCompleto: name || undefined,
