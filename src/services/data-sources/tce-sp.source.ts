@@ -59,58 +59,60 @@ export class TceSpSource implements DataSource {
 
   async fetch(config: DataSourceConfig): Promise<SourceResult[]> {
     const limit = config.quantity || 50;
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() || 12; // Previous month (0-indexed, so January→12 of prev year)
-    const targetYear = now.getMonth() === 0 ? year - 1 : year;
 
-    // Pick municipalities to search (up to 3 to stay within limits)
-    const municipiosToSearch = TOP_MUNICIPIOS.slice(0, 3);
+    // Government data has ~2 month lag, try months going back until we find data
+    const candidates = this.getMonthCandidates();
+
+    // Pick municipalities to search (up to 5 for better coverage)
+    const municipiosToSearch = TOP_MUNICIPIOS.slice(0, 5);
 
     logger.info(
-      `TCE-SP: buscando despesas de ${municipiosToSearch.length} municípios (${targetYear}/${month})`
+      `TCE-SP: buscando despesas de ${municipiosToSearch.length} municípios (tentando meses: ${candidates.map(c => `${c.year}/${c.month}`).join(", ")})`
     );
 
     const cnpjMap = new Map<string, SourceResult>();
 
     for (const municipio of municipiosToSearch) {
-      try {
-        const url = `${BASE_URL}/despesas/${municipio}/${targetYear}/${month}`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      // Try each month candidate until we find data
+      for (const { year: targetYear, month } of candidates) {
+        try {
+          const url = `${BASE_URL}/despesas/${municipio}/${targetYear}/${month}`;
+          const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
 
-        if (!res.ok) {
-          logger.warn(`TCE-SP ${municipio}: ${res.status}`);
-          continue;
-        }
-
-        const data = (await res.json()) as TceSpDespesa[];
-        if (!Array.isArray(data)) continue;
-
-        for (const d of data) {
-          if (!d.id_fornecedor) continue;
-          const cnpj = extractCnpjFromId(d.id_fornecedor);
-          if (!cnpj || !isValidCnpj(cnpj)) continue;
-
-          if (!cnpjMap.has(cnpj)) {
-            cnpjMap.set(cnpj, {
-              cnpj,
-              razaoSocial: d.nm_fornecedor || undefined,
-              uf: "SP",
-              municipio: municipio.replace(/-/g, " "),
-              valorHomologado: parseBrValue(d.vl_despesa || "") ?? undefined,
-              fonte: "tce_sp",
-            });
+          if (!res.ok) {
+            logger.warn(`TCE-SP ${municipio} ${targetYear}/${month}: ${res.status}`);
+            continue;
           }
 
-          // Stop if we have enough
-          if (cnpjMap.size >= limit) break;
-        }
+          const data = (await res.json()) as TceSpDespesa[];
+          if (!Array.isArray(data) || data.length === 0) continue;
 
-        logger.info(
-          `TCE-SP ${municipio}: ${data.length} despesas → ${cnpjMap.size} CNPJs únicos`
-        );
-      } catch (err: any) {
-        logger.warn(`TCE-SP ${municipio} error: ${err.message}`);
+          for (const d of data) {
+            if (!d.id_fornecedor) continue;
+            const cnpj = extractCnpjFromId(d.id_fornecedor);
+            if (!cnpj || !isValidCnpj(cnpj)) continue;
+
+            if (!cnpjMap.has(cnpj)) {
+              cnpjMap.set(cnpj, {
+                cnpj,
+                razaoSocial: d.nm_fornecedor || undefined,
+                uf: "SP",
+                municipio: municipio.replace(/-/g, " "),
+                valorHomologado: parseBrValue(d.vl_despesa || "") ?? undefined,
+                fonte: "tce_sp",
+              });
+            }
+
+            if (cnpjMap.size >= limit) break;
+          }
+
+          logger.info(
+            `TCE-SP ${municipio} ${targetYear}/${month}: ${data.length} despesas → ${cnpjMap.size} CNPJs únicos`
+          );
+          break; // Found data for this municipality, move to next
+        } catch (err: any) {
+          logger.warn(`TCE-SP ${municipio} ${targetYear}/${month} error: ${err.message}`);
+        }
       }
 
       if (cnpjMap.size >= limit) break;
@@ -136,5 +138,19 @@ export class TceSpSource implements DataSource {
     const results = [...cnpjMap.values()].slice(0, limit);
     logger.info(`TCE-SP: ${results.length} leads finais`);
     return results;
+  }
+
+  /** Generate month candidates going back from 2 months ago (government data lag) */
+  private getMonthCandidates(): Array<{ year: number; month: number }> {
+    const now = new Date();
+    const candidates: Array<{ year: number; month: number }> = [];
+
+    // Start from 2 months ago, try up to 4 months back
+    for (let offset = 2; offset <= 5; offset++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+      candidates.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+    }
+
+    return candidates;
   }
 }
