@@ -340,8 +340,11 @@ const HTML = `<!DOCTYPE html>
         <button class="nav-item" data-tab="campanha" data-active-class="active-green" onclick="switchTab('campanha')"><span class="nav-icon">&#128640;</span> Campanha</button>
         <button class="nav-item" data-tab="whatsapp" data-active-class="active-green" onclick="switchTab('whatsapp')"><span class="nav-icon">&#128172;</span> WhatsApp</button>
         <button class="nav-item" data-tab="automacao" data-active-class="active-amber" onclick="switchTab('automacao')"><span class="nav-icon">&#9889;</span> Automacao</button>
+
+        <div class="sidebar-section">Sistema</div>
+        <button class="nav-item" data-tab="fontes" data-active-class="active" onclick="switchTab('fontes')"><span class="nav-icon">&#127760;</span> Fontes de Dados</button>
       </nav>
-      <div class="sidebar-footer">v3.1 — Dados do PNCP</div>
+      <div class="sidebar-footer">v3.2 — 9 fontes de dados</div>
     </aside>
     <main class="main-content">
 
@@ -802,7 +805,7 @@ const HTML = `<!DOCTYPE html>
           </div>
           <div class="form-row" style="margin-top:12px">
             <div class="form-group"><label>Filtro CNAE (opcional)</label><input type="text" id="auto-cnae" placeholder="Ex: informatica, alimentacao..."></div>
-            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
+            <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="tce_sp">TCE-SP (Despesas)</option><option value="diario_oficial">Diario Oficial (Querido Diario)</option><option value="ceis">CEIS (Empresas Inidoneas)</option><option value="cnep">CNEP (Empresas Punidas)</option><option value="transparencia">TransfereGov</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
           </div>
           <div id="auto-email-fields" class="form-row" style="margin-top:12px;display:none">
             <div class="form-group"><label>Template</label><select id="auto-template" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="">Selecione...</option></select></div>
@@ -828,6 +831,230 @@ const HTML = `<!DOCTYPE html>
             <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="document.getElementById('auto-logs-section').style.display='none'">Fechar</button>
           </div>
           <div id="auto-logs-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ FONTES DE DADOS ============ -->
+    <div class="panel" id="panel-fontes">
+      <h2 style="font-size:22px;font-weight:700;margin-bottom:4px;color:#f8fafc">Fontes de Dados</h2>
+      <p style="color:#64748b;font-size:13px;margin-bottom:24px">De onde estamos buscando leads e o que procuramos em cada fonte.</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+        <!-- PNCP Licitacoes -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #3b82f6">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#128203;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">PNCP - Licitacoes</div>
+              <div style="font-size:11px;color:#64748b">pncp.gov.br</div>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">Ativo</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#60a5fa">O que busca:</strong> Licitacoes publicadas no Portal Nacional de Contratacoes Publicas com resultado definido (vencedores).<br>
+            <strong style="color:#60a5fa">O que extrai:</strong> CNPJ dos fornecedores vencedores, valor homologado, objeto da licitacao.<br>
+            <strong style="color:#60a5fa">Cobertura:</strong> Todo o Brasil - todos os orgaos federais, estaduais e municipais que publicam no PNCP.<br>
+            <strong style="color:#60a5fa">Auth:</strong> Nenhuma (API publica)
+          </div>
+        </div>
+
+        <!-- PNCP Contratos -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #3b82f6">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#128196;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">PNCP - Contratos</div>
+              <div style="font-size:11px;color:#64748b">pncp.gov.br</div>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">Ativo</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#60a5fa">O que busca:</strong> Contratos firmados via PNCP, incluindo dispensas e inexigibilidades.<br>
+            <strong style="color:#60a5fa">O que extrai:</strong> CNPJ do contratado, valor global do contrato, orgao contratante.<br>
+            <strong style="color:#60a5fa">Cobertura:</strong> Todo o Brasil.<br>
+            <strong style="color:#60a5fa">Auth:</strong> Nenhuma (API publica)
+          </div>
+        </div>
+
+        <!-- SICAF -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #22c55e">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#127970;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">SICAF (Compras.gov)</div>
+              <div style="font-size:11px;color:#64748b">compras.dados.gov.br</div>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">Ativo</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#4ade80">O que busca:</strong> Fornecedores cadastrados no Sistema de Cadastro de Fornecedores do Governo Federal.<br>
+            <strong style="color:#4ade80">O que extrai:</strong> CNPJ, razao social, municipio, UF de fornecedores ativos.<br>
+            <strong style="color:#4ade80">Cobertura:</strong> Nacional (requer filtro por UF).<br>
+            <strong style="color:#4ade80">Auth:</strong> Nenhuma (API publica)
+          </div>
+        </div>
+
+        <!-- TCE-RJ -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #eab308">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#9878;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">TCE-RJ</div>
+              <div style="font-size:11px;color:#64748b">dados.tcerj.tc.br</div>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">Ativo</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#facc15">O que busca:</strong> Contratos registrados no Tribunal de Contas do Estado do Rio de Janeiro.<br>
+            <strong style="color:#facc15">O que extrai:</strong> CNPJ do credor, nome, valor do contrato.<br>
+            <strong style="color:#facc15">Cobertura:</strong> Somente estado do Rio de Janeiro.<br>
+            <strong style="color:#facc15">Auth:</strong> Nenhuma (API publica)
+          </div>
+        </div>
+
+        <!-- TCE-SP -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #f97316">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#9878;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">TCE-SP (Despesas)</div>
+              <div style="font-size:11px;color:#64748b">transparencia.tce.sp.gov.br</div>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">Ativo</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#fb923c">O que busca:</strong> Despesas dos maiores municipios de Sao Paulo (Campinas, Guarulhos, Ribeirao Preto, Sorocaba, etc).<br>
+            <strong style="color:#fb923c">O que extrai:</strong> CNPJ dos fornecedores credores, nome, valor da despesa. Sao Paulo tem o maior volume de licitacoes do Brasil.<br>
+            <strong style="color:#fb923c">Cobertura:</strong> 645 municipios de SP (capital sob TCM-SP, nao inclusa).<br>
+            <strong style="color:#fb923c">Auth:</strong> Nenhuma (API publica)
+          </div>
+        </div>
+
+        <!-- Diario Oficial -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #a855f7">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#128240;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">Diario Oficial (Querido Diario)</div>
+              <div style="font-size:11px;color:#64748b">queridodiario.ok.org.br</div>
+            </div>
+            <span class="badge badge-green" style="margin-left:auto">Ativo</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#c084fc">O que busca:</strong> Diarios oficiais de <strong style="color:#e2e8f0">4.000+ municipios</strong> brasileiros. Busca textual por palavras-chave como "homologacao", "adjudicacao", "PAD".<br>
+            <strong style="color:#c084fc">O que extrai:</strong> <strong style="color:#e2e8f0">PJ:</strong> CNPJs de empresas citadas em homologacoes e adjudicacoes. <strong style="color:#e2e8f0">PF:</strong> CPFs de servidores em Processos Administrativos Disciplinares (PAD).<br>
+            <strong style="color:#c084fc">Cobertura:</strong> Municipal - milhares de municipios que nao publicam no PNCP.<br>
+            <strong style="color:#c084fc">Auth:</strong> Nenhuma (API publica)
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;background:#1a0a2e;border-radius:6px;font-size:11px;color:#c084fc;border:1px solid #581c87">
+            <strong>Diferencial:</strong> Unica fonte que captura <strong>pessoa fisica</strong> (servidores publicos em PAD) e cobre municipios fora do PNCP.
+          </div>
+        </div>
+
+        <!-- CEIS -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #ef4444">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#128683;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">CEIS (Empresas Inidoneas)</div>
+              <div style="font-size:11px;color:#64748b">portaldatransparencia.gov.br</div>
+            </div>
+            <span class="badge badge-yellow" style="margin-left:auto">Precisa API Key</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#f87171">O que busca:</strong> Cadastro de Empresas Inidoneas e Suspensas - empresas impedidas de licitar.<br>
+            <strong style="color:#f87171">O que extrai:</strong> CNPJ, razao social, tipo de sancao, orgao sancionador.<br>
+            <strong style="color:#f87171">Valor para o escritorio:</strong> Empresas que PRECISAM de advogado para reverter sancao ou se defender.<br>
+            <strong style="color:#f87171">Auth:</strong> <code style="background:#2a0a0a;padding:2px 6px;border-radius:4px">PORTAL_TRANSPARENCIA_KEY</code>
+          </div>
+        </div>
+
+        <!-- CNEP -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #ef4444">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#9888;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">CNEP (Empresas Punidas)</div>
+              <div style="font-size:11px;color:#64748b">portaldatransparencia.gov.br</div>
+            </div>
+            <span class="badge badge-yellow" style="margin-left:auto">Precisa API Key</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#f87171">O que busca:</strong> Cadastro Nacional de Empresas Punidas pela Lei Anticorrupcao (12.846/2013).<br>
+            <strong style="color:#f87171">O que extrai:</strong> CNPJ, razao social, valor da multa, tipo de sancao.<br>
+            <strong style="color:#f87171">Valor para o escritorio:</strong> Empresas sob penalidade severa que necessitam de defesa juridica especializada.<br>
+            <strong style="color:#f87171">Auth:</strong> <code style="background:#2a0a0a;padding:2px 6px;border-radius:4px">PORTAL_TRANSPARENCIA_KEY</code>
+          </div>
+        </div>
+
+        <!-- TransfereGov -->
+        <div style="background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155;border-top:3px solid #64748b">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:24px">&#127974;</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:#f8fafc">TransfereGov (Convenios)</div>
+              <div style="font-size:11px;color:#64748b">portaldatransparencia.gov.br</div>
+            </div>
+            <span class="badge badge-yellow" style="margin-left:auto">Precisa API Key</span>
+          </div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+            <strong style="color:#94a3b8">O que busca:</strong> Convenios e consorcios intermunicipais registrados no TransfereGov.<br>
+            <strong style="color:#94a3b8">O que extrai:</strong> CNPJ dos convenentes, valor do convenio, UF/municipio.<br>
+            <strong style="color:#94a3b8">Cobertura:</strong> Nacional - foco em consorcios publicos.<br>
+            <strong style="color:#94a3b8">Auth:</strong> <code style="background:#1e293b;padding:2px 6px;border-radius:4px">PORTAL_TRANSPARENCIA_KEY</code>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Como obter a API Key -->
+      <div style="margin-top:24px;background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155">
+        <h3 style="font-size:16px;margin-bottom:12px;color:#f8fafc">Como ativar CEIS, CNEP e TransfereGov</h3>
+        <div style="font-size:13px;color:#94a3b8;line-height:1.8">
+          <div style="display:flex;align-items:start;gap:10px;margin-bottom:8px">
+            <span style="background:#3b82f6;color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:700;flex-shrink:0">1</span>
+            <span>Acesse <strong style="color:#e2e8f0">portaldatransparencia.gov.br/api-de-dados/cadastrar-email</strong> e registre seu email.</span>
+          </div>
+          <div style="display:flex;align-items:start;gap:10px;margin-bottom:8px">
+            <span style="background:#3b82f6;color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:700;flex-shrink:0">2</span>
+            <span>Voce recebera a <strong style="color:#e2e8f0">chave da API</strong> por email.</span>
+          </div>
+          <div style="display:flex;align-items:start;gap:10px">
+            <span style="background:#3b82f6;color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:700;flex-shrink:0">3</span>
+            <span>Configure a variavel <code style="background:#0f172a;padding:2px 8px;border-radius:4px;color:#f59e0b">PORTAL_TRANSPARENCIA_KEY</code> no Railway. A mesma chave serve para CEIS, CNEP e TransfereGov.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo do pipeline -->
+      <div style="margin-top:24px;background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155">
+        <h3 style="font-size:16px;margin-bottom:12px;color:#f8fafc">Pipeline de Enriquecimento</h3>
+        <div style="font-size:13px;color:#94a3b8;line-height:1.6">
+          Para cada CNPJ encontrado nas fontes acima, o sistema consulta <strong style="color:#e2e8f0">4 APIs</strong> para obter dados de contato:
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px">
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:13px;font-weight:700;color:#60a5fa">BrasilAPI</div>
+            <div style="font-size:11px;color:#64748b">Email + Telefone + CNAE</div>
+          </div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:13px;font-weight:700;color:#4ade80">CNPJa</div>
+            <div style="font-size:11px;color:#64748b">Email + Telefones</div>
+          </div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:13px;font-weight:700;color:#facc15">CNPJ.ws</div>
+            <div style="font-size:11px;color:#64748b">Email + Telefones</div>
+          </div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+            <div style="font-size:13px;font-weight:700;color:#fb923c">ReceitaWS</div>
+            <div style="font-size:11px;color:#64748b">Email + Telefone</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#64748b">
+          Apos o enriquecimento, leads sao classificados automaticamente como <span class="badge badge-blue">empresa</span> ou <span class="badge badge-orange">contabilidade</span> com base no email, CNAE e razao social.
+          Telefones sao normalizados para formato E.164 e marcados como celular quando aplicavel (para campanha WhatsApp).
         </div>
       </div>
     </div>
