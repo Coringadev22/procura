@@ -8,6 +8,10 @@ export interface SourceResult {
   cnaePrincipal?: string;
   valorHomologado?: number;
   fonte: string;
+  // PF fields
+  tipoPessoa?: "PJ" | "PF";
+  cpf?: string;
+  nomeCompleto?: string;
 }
 
 export interface DataSourceConfig {

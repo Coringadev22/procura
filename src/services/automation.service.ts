@@ -167,6 +167,9 @@ export async function executeJob(jobId: number): Promise<void> {
       uf: string | null;
       valor: string;
       valorNum: number | null;
+      tipoPessoa?: "PJ" | "PF";
+      cpf?: string;
+      nomeCompleto?: string;
     }
 
     const recipientMap = new Map<string, Recipient>();
@@ -208,6 +211,9 @@ export async function executeJob(jobId: number): Promise<void> {
                   ? `R$ ${sr.valorHomologado.toLocaleString("pt-BR")}`
                   : "",
                 valorNum: sr.valorHomologado ?? null,
+                tipoPessoa: sr.tipoPessoa,
+                cpf: sr.cpf,
+                nomeCompleto: sr.nomeCompleto,
               });
             }
           } else if (sr.email && !recipientMap.has(key)) {
@@ -225,6 +231,9 @@ export async function executeJob(jobId: number): Promise<void> {
                 ? `R$ ${sr.valorHomologado.toLocaleString("pt-BR")}`
                 : "",
               valorNum: sr.valorHomologado ?? null,
+              tipoPessoa: sr.tipoPessoa,
+              cpf: sr.cpf,
+              nomeCompleto: sr.nomeCompleto,
             });
           }
         }
@@ -352,6 +361,9 @@ export async function executeJob(jobId: number): Promise<void> {
 
         await db.insert(leads).values({
           cnpj,
+          tipoPessoa: r.tipoPessoa || "PJ",
+          cpf: r.cpf || null,
+          nomeCompleto: r.nomeCompleto || null,
           razaoSocial: r.empresa || null,
           nomeFantasia: r.nomeFantasia || null,
           email: r.email?.toLowerCase() || null,

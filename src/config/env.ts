@@ -15,6 +15,8 @@ const envSchema = z.object({
   EVOLUTION_INSTANCE_NAME: z.string().default("procura"),
   WHATSAPP_DAILY_LIMIT: z.coerce.number().default(50),
   WHATSAPP_ENABLED: z.coerce.boolean().default(false),
+  // Portal da Transparência API (CEIS, CNEP, TransfereGov)
+  PORTAL_TRANSPARENCIA_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

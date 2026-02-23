@@ -182,6 +182,9 @@ export const automationJobs = pgTable("automation_jobs", {
 export const leads = pgTable("leads", {
   id: serial("id").primaryKey(),
   cnpj: text("cnpj").notNull().unique(),
+  tipoPessoa: text("tipo_pessoa").notNull().default("PJ"),
+  cpf: text("cpf"),
+  nomeCompleto: text("nome_completo"),
   razaoSocial: text("razao_social"),
   nomeFantasia: text("nome_fantasia"),
   email: text("email"),

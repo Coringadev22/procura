@@ -30,7 +30,7 @@ export class TransparenciaSource implements DataSource {
   readonly label = "TransfereGov - Consorcios";
 
   async fetch(config: DataSourceConfig): Promise<SourceResult[]> {
-    const apiKey = process.env.PORTAL_TRANSPARENCIA_KEY;
+    const apiKey = process.env.PORTAL_TRANSPARENCIA_KEY || "";
     if (!apiKey) {
       throw new Error(
         "Chave da API do Portal da Transparencia nao configurada. " +
