@@ -12,24 +12,18 @@ const EMPRESA_RATIO = 0.9;
 const REMARKETING_DELAY_DAYS = 7;
 const DELAY_BETWEEN_SENDS_MS = 3000; // 3 seconds (WhatsApp is stricter)
 
-// ============ TEMPLATES ============
+// ============ TEMPLATES (5 categorias) ============
 
-const EMPRESA_V1 = `Boa tarde! Sou Alvaro Gonzaga, advogado especializado em licitações e contratos públicos.
+// 1.1 Empresas que licitam (pncp, pncp_contratos, sicaf, tce_sp, tce_rj)
+const LICITANTES_V1 = `Oi, poderia me informar quem é o responsável pela área de licitações na empresa?
 
-Vi que a {empresa} tem atuado no mercado de contratações públicas e gostaria de me colocar à disposição.
-
-Nosso escritório atua em todo o Brasil oferecendo:
-• Análise de editais e recursos administrativos
-• Defesa em penalidades e impedimentos
-• Reequilíbrio econômico-financeiro de contratos
-
-Se fizer sentido para sua empresa, posso explicar brevemente como podemos contribuir.
+Sou Alvaro Gonzaga, advogado especializado em licitações e contratos públicos.
 
 www.alvarogonzaga.com.br
 
 Responda SAIR para não receber mais mensagens.`;
 
-const EMPRESA_V2 = `Olá! Entramos em contato há alguns dias sobre assessoria jurídica em licitações.
+const LICITANTES_V2 = `Olá! Entramos em contato há alguns dias sobre assessoria jurídica em licitações.
 
 Caso tenha interesse, oferecemos uma conversa breve e sem compromisso para avaliar como podemos ajudar a {empresa} a reduzir riscos e aumentar resultados em contratações públicas.
 
@@ -40,16 +34,64 @@ www.alvarogonzaga.com.br
 
 Responda SAIR para não receber mais mensagens.`;
 
-const CONTABILIDADE_V1 = `Boa tarde! Sou Alvaro Gonzaga, advogado especializado em licitações e contratos públicos.
+// 1.2 Empresas executadas / punidas (ceis, cnep)
+const EXECUTADAS_V1 = `Oi, sou advogado e atuo na área de execuções fiscais empresariais.
 
-Trabalho com diversos escritórios de contabilidade que atendem empresas participantes de licitações. Gostaria de apresentar uma parceria que pode agregar valor aos seus clientes.
+Tenho auxiliado empresas a suspender bloqueios e discutir débitos. Vocês já possuem acompanhamento jurídico nessa área?
 
-Nosso escritório oferece:
-• Assessoria completa em licitações
-• Defesa administrativa e judicial
-• Análise de editais e contratos
+www.alvarogonzaga.com.br
 
-Se tiver interesse em conhecer nossa proposta de parceria, fico à disposição para uma conversa breve.
+Responda SAIR para não receber mais mensagens.`;
+
+const EXECUTADAS_V2 = `Olá! Entramos em contato há alguns dias sobre defesa em execuções fiscais.
+
+Se a {empresa} está enfrentando alguma situação de bloqueio ou penalidade, posso avaliar o caso sem compromisso.
+
+Alvaro Gonzaga
+www.alvarogonzaga.com.br
+
+Responda SAIR para não receber mais mensagens.`;
+
+// 1.3 PF respondendo PAD (diario_oficial com PAD)
+const PAD_V1 = `Oi, sou advogado e atuo na defesa de servidores em Processos Administrativos Disciplinares.
+
+Você já está acompanhando a situação?
+
+www.alvarogonzaga.com.br
+
+Responda SAIR para não receber mais mensagens.`;
+
+const PAD_V2 = `Olá! Entramos em contato há alguns dias sobre defesa em PAD.
+
+Se precisar de orientação jurídica sobre o processo, posso avaliar sua situação sem compromisso.
+
+Alvaro Gonzaga
+www.alvarogonzaga.com.br
+
+Responda SAIR para não receber mais mensagens.`;
+
+// 1.4 PF sendo executadas
+const EXECUCAO_PF_V1 = `Oi, sou advogado e atuo na defesa em execuções judiciais, inclusive com possibilidade de revisão de valores e suspensão de bloqueios.
+
+Você já está acompanhando sua situação?
+
+www.alvarogonzaga.com.br
+
+Responda SAIR para não receber mais mensagens.`;
+
+const EXECUCAO_PF_V2 = `Olá! Entramos em contato há alguns dias sobre defesa em execuções judiciais.
+
+Se precisar de orientação sobre revisão de valores ou suspensão de bloqueios, posso avaliar seu caso sem compromisso.
+
+Alvaro Gonzaga
+www.alvarogonzaga.com.br
+
+Responda SAIR para não receber mais mensagens.`;
+
+// 1.5 Contadores (parceria)
+const CONTABILIDADE_V1 = `Oi, sou advogado com atuação em licitações e execuções fiscais empresariais.
+
+Estou buscando parcerias com escritórios de contabilidade para atendimento conjunto de clientes. Posso falar com alguém a respeito?
 
 www.alvarogonzaga.com.br
 
@@ -65,6 +107,40 @@ Alvaro Gonzaga
 www.alvarogonzaga.com.br
 
 Responda SAIR para não receber mais mensagens.`;
+
+// ============ TEMPLATE SELECTION ============
+
+/** Map lead to the correct template based on fonte and categoria */
+function getTemplateForLead(
+  lead: { fonte: string | null; categoria: string; tipoPessoa: string | null },
+  sequence: 1 | 2
+): { name: string; body: string } {
+  // Contabilidade always gets partnership template
+  if (lead.categoria === "contabilidade") {
+    return sequence === 1
+      ? { name: "Contabilidade V1", body: CONTABILIDADE_V1 }
+      : { name: "Contabilidade V2", body: CONTABILIDADE_V2 };
+  }
+
+  // PF leads from PAD
+  if (lead.tipoPessoa === "PF" && lead.fonte === "diario_oficial") {
+    return sequence === 1
+      ? { name: "PAD V1", body: PAD_V1 }
+      : { name: "PAD V2", body: PAD_V2 };
+  }
+
+  // Empresas executadas/punidas
+  if (lead.fonte === "ceis" || lead.fonte === "cnep") {
+    return sequence === 1
+      ? { name: "Executadas V1", body: EXECUTADAS_V1 }
+      : { name: "Executadas V2", body: EXECUTADAS_V2 };
+  }
+
+  // Default: empresas que licitam
+  return sequence === 1
+    ? { name: "Licitantes V1", body: LICITANTES_V1 }
+    : { name: "Licitantes V2", body: LICITANTES_V2 };
+}
 
 // ============ CAMPAIGN RESULT ============
 
@@ -155,9 +231,8 @@ async function executeCampaign(): Promise<WhatsAppCampaignResult> {
     if (remainingBudget <= 0) break;
 
     try {
-      const template = lead.categoria === "contabilidade" ? CONTABILIDADE_V2 : EMPRESA_V2;
-      const tplName = lead.categoria === "contabilidade" ? "Contabilidade V2" : "Empresa V2";
-      const success = await sendCampaignWhatsApp(lead, tplName, template, 2);
+      const tpl = getTemplateForLead(lead, 2);
+      const success = await sendCampaignWhatsApp(lead, tpl.name, tpl.body, 2);
 
       if (success) {
         v2Sent++;
@@ -177,47 +252,27 @@ async function executeCampaign(): Promise<WhatsAppCampaignResult> {
 
   // ---- FLOW 1: V1 FIRST CONTACT (remaining budget) ----
   if (remainingBudget > 0) {
-    const empresaBudget = Math.floor(remainingBudget * EMPRESA_RATIO);
-    const contabBudget = remainingBudget - empresaBudget;
-
-    // Empresa V1: leads with mobile, never contacted via WhatsApp,
-    // and emailSentCount >= 1 (already received email V1 at least)
-    const v1Empresas = await db
+    // Get all V1 eligible leads (mobile, never WPP'd, email sent)
+    const v1All = await db
       .select()
       .from(leads)
       .where(
         and(
           eq(leads.whatsappSentCount, 0),
           eq(leads.temCelular, true),
-          eq(leads.categoria, "empresa"),
-          isNotNull(leads.telefones),
-          sql`${leads.emailSentCount} >= 1` // only after email V1
-        )
-      )
-      .limit(empresaBudget);
-
-    const v1Contabs = await db
-      .select()
-      .from(leads)
-      .where(
-        and(
-          eq(leads.whatsappSentCount, 0),
-          eq(leads.temCelular, true),
-          eq(leads.categoria, "contabilidade"),
           isNotNull(leads.telefones),
           sql`${leads.emailSentCount} >= 1`
         )
       )
-      .limit(contabBudget);
+      .limit(remainingBudget);
 
-    logger.info(
-      `WhatsApp V1: ${v1Empresas.length} empresas, ${v1Contabs.length} contabilidades (budget: ${empresaBudget}/${contabBudget})`
-    );
+    logger.info(`WhatsApp V1: ${v1All.length} leads eligible (budget: ${remainingBudget})`);
 
-    for (const lead of v1Empresas) {
+    for (const lead of v1All) {
       if (remainingBudget <= 0) break;
       try {
-        const success = await sendCampaignWhatsApp(lead, "Empresa V1", EMPRESA_V1, 1);
+        const tpl = getTemplateForLead(lead, 1);
+        const success = await sendCampaignWhatsApp(lead, tpl.name, tpl.body, 1);
         if (success) {
           v1Sent++;
           remainingBudget--;
@@ -225,24 +280,7 @@ async function executeCampaign(): Promise<WhatsAppCampaignResult> {
           v1Failed++;
         }
       } catch (err: any) {
-        logger.error(`WhatsApp V1 empresa error for ${lead.cnpj}: ${err.message}`);
-        v1Failed++;
-      }
-      await new Promise((r) => setTimeout(r, DELAY_BETWEEN_SENDS_MS));
-    }
-
-    for (const lead of v1Contabs) {
-      if (remainingBudget <= 0) break;
-      try {
-        const success = await sendCampaignWhatsApp(lead, "Contabilidade V1", CONTABILIDADE_V1, 1);
-        if (success) {
-          v1Sent++;
-          remainingBudget--;
-        } else {
-          v1Failed++;
-        }
-      } catch (err: any) {
-        logger.error(`WhatsApp V1 contab error for ${lead.cnpj}: ${err.message}`);
+        logger.error(`WhatsApp V1 error for ${lead.cnpj}: ${err.message}`);
         v1Failed++;
       }
       await new Promise((r) => setTimeout(r, DELAY_BETWEEN_SENDS_MS));

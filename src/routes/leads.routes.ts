@@ -218,20 +218,14 @@ export async function leadsRoutes(app: FastifyInstance) {
     return { total: allLeads.length, reclassified, changes };
   });
 
-  // Re-enrich leads without phones (or normalize existing)
-  app.post("/api/leads/re-enrich-phones", async () => {
-    const { lookupCnpj } = await import("../services/cnpj-lookup.service.js");
-
-    // Get leads missing phones or with un-normalized phones
+  // Normalize phones and fix temCelular (fast, synchronous)
+  app.post("/api/leads/normalize-phones", async () => {
     const allLeads = await db.select().from(leads);
-    const needsEnrich = allLeads.filter((l) => !l.telefones || l.telefones.trim() === "");
-
-    let enriched = 0;
-    let normalized = 0;
-    let failed = 0;
-
-    // First: normalize leads that already have phones but need temCelular flag
     const hasPhones = allLeads.filter((l) => l.telefones && l.telefones.trim() !== "");
+
+    let normalized = 0;
+    let mobileFound = 0;
+
     for (const lead of hasPhones) {
       const nPhones = mergePhones(lead.telefones);
       const hasMob = nPhones
@@ -242,40 +236,77 @@ export async function leadsRoutes(app: FastifyInstance) {
           .set({ telefones: nPhones, temCelular: hasMob })
           .where(eq(leads.id, lead.id));
         normalized++;
+        if (hasMob) mobileFound++;
+      } else if (hasMob && !lead.temCelular) {
+        mobileFound++;
       }
     }
 
-    // Then: re-enrich leads without phones (rate limited by CNPJ lookup queues)
-    for (const lead of needsEnrich) {
-      try {
-        const data = await lookupCnpj(lead.cnpj);
-        if (data.telefones) {
-          const nPhones = mergePhones(data.telefones);
-          const hasMob = nPhones
-            ? parsePhoneList(nPhones).some(isMobilePhone)
-            : false;
-          await db.update(leads)
-            .set({
-              telefones: nPhones,
-              temCelular: hasMob,
-              ...(data.email && !lead.email ? { email: data.email.toLowerCase() } : {}),
-            })
-            .where(eq(leads.id, lead.id));
-          enriched++;
+    return { total: allLeads.length, withPhones: hasPhones.length, normalized, mobileFound };
+  });
+
+  // Background phone enrichment state
+  let phoneEnrichRunning = false;
+  let phoneEnrichProgress = { total: 0, processed: 0, enriched: 0, failed: 0, startedAt: null as string | null };
+
+  // Enrich phones in background (fire-and-forget)
+  app.post<{ Querystring: { limit?: string } }>("/api/leads/enrich-phones-background", async (request) => {
+    if (phoneEnrichRunning) {
+      return { running: true, progress: phoneEnrichProgress };
+    }
+
+    const limit = parseInt(request.query.limit || "500", 10);
+    const { lookupCnpj } = await import("../services/cnpj-lookup.service.js");
+
+    // Get leads without phones, prioritize emailed leads (eligible for WhatsApp V1)
+    const needsEnrich = await db.select().from(leads).where(
+      sql`(${leads.telefones} IS NULL OR ${leads.telefones} = '') AND length(${leads.cnpj}) = 14`
+    );
+
+    // Sort: emailed leads first, then by creation date
+    needsEnrich.sort((a, b) => (b.emailSentCount ?? 0) - (a.emailSentCount ?? 0));
+    const batch = needsEnrich.slice(0, limit);
+
+    phoneEnrichRunning = true;
+    phoneEnrichProgress = { total: batch.length, processed: 0, enriched: 0, failed: 0, startedAt: new Date().toISOString() };
+
+    // Fire and forget
+    (async () => {
+      for (const lead of batch) {
+        try {
+          const data = await lookupCnpj(lead.cnpj);
+          const updates: Record<string, any> = {};
+
+          if (data.telefones) {
+            const nPhones = mergePhones(data.telefones);
+            const hasMob = nPhones ? parsePhoneList(nPhones).some(isMobilePhone) : false;
+            updates.telefones = nPhones;
+            updates.temCelular = hasMob;
+          }
+          if (data.email && !lead.email) updates.email = data.email.toLowerCase();
+          if (data.razaoSocial && !lead.razaoSocial) updates.razaoSocial = data.razaoSocial;
+          if (data.nomeFantasia && !lead.nomeFantasia) updates.nomeFantasia = data.nomeFantasia;
+          if (data.municipio && !lead.municipio) updates.municipio = data.municipio;
+          if (data.uf && !lead.uf) updates.uf = data.uf;
+
+          if (Object.keys(updates).length > 0) {
+            await db.update(leads).set(updates).where(eq(leads.id, lead.id));
+            if (updates.telefones) phoneEnrichProgress.enriched++;
+          }
+        } catch {
+          phoneEnrichProgress.failed++;
         }
-      } catch (err) {
-        failed++;
+        phoneEnrichProgress.processed++;
       }
-    }
+      phoneEnrichRunning = false;
+    })();
 
-    return {
-      total: allLeads.length,
-      withPhones: hasPhones.length,
-      normalized,
-      needsEnrich: needsEnrich.length,
-      enriched,
-      failed,
-    };
+    return { started: true, total: batch.length, totalPending: needsEnrich.length };
+  });
+
+  // Check enrichment progress
+  app.get("/api/leads/enrich-phones-progress", async () => {
+    return { running: phoneEnrichRunning, progress: phoneEnrichProgress };
   });
 
   // Re-enrich leads missing razaoSocial (fixes BrasilAPI failures)

@@ -744,6 +744,29 @@ const HTML = `<!DOCTYPE html>
       </div>
 
       <div class="search-box" style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2>Preparacao de Telefones</h2>
+        </div>
+        <p style="color:#64748b;font-size:13px;margin-bottom:12px">Normaliza telefones existentes (formato E.164) e enriquece leads sem telefone via CNPJ lookup para tornar elegiveis ao WhatsApp.</p>
+        <div id="phone-stats" style="margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#f8fafc" id="ps-total">-</div><div style="font-size:10px;color:#64748b">Total leads</div></div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#22c55e" id="ps-mobile">-</div><div style="font-size:10px;color:#64748b">Com celular</div></div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#3b82f6" id="ps-phone">-</div><div style="font-size:10px;color:#64748b">Com telefone</div></div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#f59e0b" id="ps-nophone">-</div><div style="font-size:10px;color:#64748b">Sem telefone</div></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="background:#3b82f6;color:#fff" onclick="normalizePhones()">1. Normalizar Telefones</button>
+          <button class="btn btn-sm" style="background:#22c55e;color:#fff" onclick="enrichPhonesBackground()">2. Enriquecer Sem Telefone</button>
+          <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="loadPhoneStats()">Atualizar</button>
+        </div>
+        <div id="phone-action-result" style="margin-top:8px;font-size:13px;color:#64748b"></div>
+        <div id="phone-enrich-progress" style="display:none;margin-top:10px;padding:10px;background:#0f172a;border-radius:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:6px"><span id="pe-label">Enriquecendo...</span><span id="pe-count">0/0</span></div>
+          <div style="background:#1e293b;border-radius:4px;height:8px;overflow:hidden"><div id="pe-bar" style="background:#22c55e;height:100%;width:0%;transition:width 0.5s"></div></div>
+        </div>
+      </div>
+
+      <div class="search-box" style="margin-top:20px">
         <h2>Teste de Envio</h2>
         <div style="display:flex;gap:8px;margin-top:10px">
           <input type="text" id="wa-test-phone" placeholder="+5511999998888" style="flex:1;padding:8px 12px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#f8fafc;font-size:14px">
@@ -2620,6 +2643,10 @@ async function loadWhatsApp() {
     renderWaStatus(status, stats);
     renderWaPipeline(pipeline);
     renderWaAnalytics(stats);
+    loadPhoneStats();
+    // Check if enrichment is running
+    const enrichProgress = await apiFetch('/api/leads/enrich-phones-progress');
+    if (enrichProgress.running) startEnrichPolling();
   } catch(e) {
     document.getElementById('wa-status').innerHTML = '<div class="stat"><div class="stat-value" style="color:#ef4444">Erro</div><div class="stat-label">' + e.message + '</div></div>';
   }
@@ -2716,6 +2743,71 @@ async function sendWaTest() {
       result.innerHTML = '<span style="color:#ef4444">Falha: ' + (data.error || 'erro desconhecido') + '</span>';
     }
   } catch(e) { result.innerHTML = '<span style="color:#ef4444">Erro: ' + e.message + '</span>'; }
+}
+
+// ============ PHONE NORMALIZATION / ENRICHMENT ============
+
+async function loadPhoneStats() {
+  try {
+    const data = await apiFetch('/api/leads/stats');
+    const all = await apiFetch('/api/leads');
+    const withPhone = all.filter(l => l.telefones && l.telefones.trim() !== '').length;
+    const withMobile = all.filter(l => l.temCelular).length;
+    document.getElementById('ps-total').textContent = all.length;
+    document.getElementById('ps-mobile').textContent = withMobile;
+    document.getElementById('ps-phone').textContent = withPhone;
+    document.getElementById('ps-nophone').textContent = all.length - withPhone;
+  } catch(e) {
+    console.error('loadPhoneStats error:', e);
+  }
+}
+
+async function normalizePhones() {
+  const result = document.getElementById('phone-action-result');
+  result.innerHTML = '<span style="color:#3b82f6">Normalizando telefones...</span>';
+  try {
+    const data = await apiPost('/api/leads/normalize-phones', {});
+    result.innerHTML = '<span style="color:#22c55e">Normalizado! ' + data.normalized + ' leads atualizados, ' + data.mobileFound + ' com celular detectado</span>';
+    // Also normalize fornecedores cache
+    await apiPost('/api/fornecedores/normalize-phones', {});
+    loadPhoneStats();
+  } catch(e) { result.innerHTML = '<span style="color:#ef4444">Erro: ' + e.message + '</span>'; }
+}
+
+let enrichPolling = null;
+async function enrichPhonesBackground() {
+  const result = document.getElementById('phone-action-result');
+  result.innerHTML = '<span style="color:#22c55e">Iniciando enriquecimento...</span>';
+  try {
+    const data = await apiPost('/api/leads/enrich-phones-background?limit=500', {});
+    if (data.running) {
+      result.innerHTML = '<span style="color:#f59e0b">Ja em andamento!</span>';
+    } else {
+      result.innerHTML = '<span style="color:#22c55e">Iniciado! ' + data.total + ' leads para enriquecer (de ' + data.totalPending + ' pendentes)</span>';
+    }
+    startEnrichPolling();
+  } catch(e) { result.innerHTML = '<span style="color:#ef4444">Erro: ' + e.message + '</span>'; }
+}
+
+function startEnrichPolling() {
+  const bar = document.getElementById('phone-enrich-progress');
+  bar.style.display = 'block';
+  if (enrichPolling) clearInterval(enrichPolling);
+  enrichPolling = setInterval(async () => {
+    try {
+      const data = await apiFetch('/api/leads/enrich-phones-progress');
+      const p = data.progress;
+      const pct = p.total > 0 ? Math.round((p.processed / p.total) * 100) : 0;
+      document.getElementById('pe-label').textContent = data.running ? 'Enriquecendo... (' + p.enriched + ' com telefone)' : 'Concluido! ' + p.enriched + ' enriquecidos';
+      document.getElementById('pe-count').textContent = p.processed + '/' + p.total;
+      document.getElementById('pe-bar').style.width = pct + '%';
+      if (!data.running) {
+        clearInterval(enrichPolling);
+        enrichPolling = null;
+        loadPhoneStats();
+      }
+    } catch(e) { console.error(e); }
+  }, 5000);
 }
 
 // ============ INIT ============

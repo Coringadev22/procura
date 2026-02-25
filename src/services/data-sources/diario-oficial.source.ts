@@ -86,7 +86,7 @@ export class DiarioOficialSource implements DataSource {
     const params = new URLSearchParams({
       querystring: keyword,
       size: String(size),
-      excerpt_size: "2000",
+      excerpt_size: "3000",
       number_of_excerpts: "3",
       sort_by: "descending_date",
     });
@@ -102,9 +102,9 @@ export class DiarioOficialSource implements DataSource {
       params.set("published_until", config.dataFinal);
     }
 
-    // Filter by state if provided (UF → IBGE territory_id prefix)
+    // Filter by state via API parameter (supported by Querido Diário)
     if (config.uf) {
-      // We can't filter by state directly, but we'll filter results after
+      params.set("state_code", config.uf.toUpperCase());
     }
 
     const url = `${BASE_URL}/gazettes?${params}`;

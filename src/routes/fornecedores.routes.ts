@@ -4,6 +4,7 @@ import { db } from "../config/database.js";
 import { fornecedores } from "../db/schema.js";
 import { lookupCnpj } from "../services/cnpj-lookup.service.js";
 import { cleanCnpj, isValidCnpj } from "../utils/cnpj.js";
+import { mergePhones } from "../utils/phone.js";
 
 export async function fornecedoresRoutes(app: FastifyInstance) {
   // Lookup single CNPJ
@@ -64,5 +65,24 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
       page,
       pageSize,
     };
+  });
+
+  // Normalize phones in fornecedores cache
+  app.post("/api/fornecedores/normalize-phones", async () => {
+    const all = await db.select().from(fornecedores);
+    const hasPhones = all.filter((f) => f.telefones && f.telefones.trim() !== "");
+    let normalized = 0;
+
+    for (const f of hasPhones) {
+      const nPhones = mergePhones(f.telefones);
+      if (nPhones !== f.telefones) {
+        await db.update(fornecedores)
+          .set({ telefones: nPhones })
+          .where(eq(fornecedores.cnpj, f.cnpj));
+        normalized++;
+      }
+    }
+
+    return { total: all.length, withPhones: hasPhones.length, normalized };
   });
 }
