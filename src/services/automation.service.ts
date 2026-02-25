@@ -195,9 +195,11 @@ export async function executeJob(jobId: number): Promise<void> {
             continue;
           }
 
-          // Pass 2: No phones in cache — invalidate cache and force fresh API lookup
+          // Pass 2: No phones in cache — invalidate cache TTL to force fresh API lookup
           if (cached) {
-            await db.delete(fornecedores).where(eq(fornecedores.cnpj, lead.cnpj));
+            await db.update(fornecedores)
+              .set({ lastLookupAt: null })
+              .where(eq(fornecedores.cnpj, lead.cnpj));
           }
           const data = await lookupCnpj(lead.cnpj);
           const updates: Record<string, any> = {};
