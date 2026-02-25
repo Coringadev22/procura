@@ -62,7 +62,8 @@ try {
   // WhatsApp (only if configured)
   if (env.WHATSAPP_ENABLED) {
     await initializeInstance();
-    startDailyWhatsAppScheduler();
+    // WhatsApp campaign scheduler desativado por enquanto (disparo manual apenas)
+    // startDailyWhatsAppScheduler();
   }
 
   logger.info(`Servidor rodando em http://localhost:${env.PORT}`);
