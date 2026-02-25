@@ -172,9 +172,33 @@ export async function executeJob(jobId: number): Promise<void> {
       emailsFound = batch.length;
       let enriched = 0;
       let enrichFailed = 0;
+      let fromCache = 0;
 
       for (const lead of batch) {
         try {
+          // Pass 1: Check if fornecedores cache already has phones
+          const [cached] = await db.select().from(fornecedores).where(eq(fornecedores.cnpj, lead.cnpj));
+
+          if (cached?.telefones) {
+            // Cache has phones — copy to lead directly (fast)
+            const nPhones = mergePhones(cached.telefones);
+            const hasMob = nPhones ? parsePhoneList(nPhones).some(isMobilePhone) : false;
+            const updates: Record<string, any> = { telefones: nPhones, temCelular: hasMob };
+            if (cached.email && !lead.email) updates.email = cached.email.toLowerCase();
+            if (cached.razaoSocial && !lead.razaoSocial) updates.razaoSocial = cached.razaoSocial;
+            if (cached.nomeFantasia && !lead.nomeFantasia) updates.nomeFantasia = cached.nomeFantasia;
+            if (cached.municipio && !lead.municipio) updates.municipio = cached.municipio;
+            if (cached.uf && !lead.uf) updates.uf = cached.uf;
+            await db.update(leads).set(updates).where(eq(leads.id, lead.id));
+            enriched++;
+            fromCache++;
+            continue;
+          }
+
+          // Pass 2: No phones in cache — invalidate cache and force fresh API lookup
+          if (cached) {
+            await db.delete(fornecedores).where(eq(fornecedores.cnpj, lead.cnpj));
+          }
           const data = await lookupCnpj(lead.cnpj);
           const updates: Record<string, any> = {};
 
@@ -225,6 +249,7 @@ export async function executeJob(jobId: number): Promise<void> {
             totalPending: needsEnrich.length,
             processed: batch.length,
             enriched,
+            fromCache,
             failed: enrichFailed,
           }),
           updatedAt: now,
@@ -232,7 +257,7 @@ export async function executeJob(jobId: number): Promise<void> {
         .where(eq(automationJobs.id, jobId));
 
       logger.info(
-        `Enrich Phones "${job.name}" concluido: ${enriched} enriquecidos, ${enrichFailed} falharam de ${batch.length} processados (${needsEnrich.length} pendentes total)`
+        `Enrich Phones "${job.name}" concluido: ${enriched} enriquecidos (${fromCache} do cache), ${enrichFailed} falharam de ${batch.length} processados (${needsEnrich.length} pendentes total)`
       );
 
       await scheduleJob(jobId);
