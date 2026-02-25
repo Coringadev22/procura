@@ -111,7 +111,7 @@ Responda SAIR para não receber mais mensagens.`;
 // ============ TEMPLATE SELECTION ============
 
 /** Map lead to the correct template based on fonte and categoria */
-function getTemplateForLead(
+export function getTemplateForLead(
   lead: { fonte: string | null; categoria: string; tipoPessoa: string | null },
   sequence: 1 | 2
 ): { name: string; body: string } {

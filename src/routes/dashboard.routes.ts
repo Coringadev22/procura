@@ -818,7 +818,7 @@ const HTML = `<!DOCTYPE html>
           <input type="hidden" id="auto-edit-id" value="">
           <div class="form-row">
             <div class="form-group" style="flex:2"><label>Nome do Job</label><input type="text" id="auto-name" placeholder="Ex: Busca diaria informatica SP"></div>
-            <div class="form-group" style="flex:0.8"><label>Tipo</label><select id="auto-job-type" onchange="toggleAutoJobType()" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="populate_leads">Popular Leads</option><option value="email_send">Enviar Emails</option></select></div>
+            <div class="form-group" style="flex:0.8"><label>Tipo</label><select id="auto-job-type" onchange="toggleAutoJobType()" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="populate_leads">Popular Leads</option><option value="email_send">Enviar Emails</option><option value="whatsapp_send">Enviar WhatsApp</option></select></div>
             <div class="form-group" style="flex:0.8"><label>Intervalo</label><select id="auto-interval" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="6">A cada 6h</option><option value="12">A cada 12h</option><option value="24">A cada 24h</option><option value="48">A cada 2 dias</option><option value="72">A cada 3 dias</option><option value="168">Semanal</option></select></div>
           </div>
           <div class="form-row" style="margin-top:12px">
@@ -2304,7 +2304,8 @@ function renderAutoJobs() {
     const stats = j.lastRunStats ? JSON.parse(j.lastRunStats) : null;
     const statusBadge = j.isActive ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Pausado</span>';
     const isPopulate = j.jobType === 'populate_leads';
-    const typeBadge = isPopulate ? '<span class="badge badge-blue">Popular Leads</span>' : '<span class="badge badge-yellow">Enviar Emails</span>';
+    const isWhatsApp = j.jobType === 'whatsapp_send';
+    const typeBadge = isPopulate ? '<span class="badge badge-blue">Popular Leads</span>' : isWhatsApp ? '<span class="badge" style="background:#25d366;color:#fff">WhatsApp</span>' : '<span class="badge badge-yellow">Enviar Emails</span>';
     const lastBadge = j.lastRunStatus ? ('<span class="badge ' + (j.lastRunStatus === 'completed' || j.lastRunStatus === 'success' ? 'badge-green' : j.lastRunStatus === 'failed' ? 'badge-red' : 'badge-yellow') + '">' + j.lastRunStatus + '</span>') : '<span class="badge badge-gray">Nunca executado</span>';
     const hours = j.intervalHours || (j.intervalDays ? j.intervalDays * 24 : 24);
     const intervalLabel = hours < 24 ? 'A cada ' + hours + 'h' : hours === 24 ? 'Diario' : 'A cada ' + (hours / 24) + ' dia(s)';

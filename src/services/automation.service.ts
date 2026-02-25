@@ -1,4 +1,4 @@
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { db } from "../config/database.js";
 import {
   automationJobs,
@@ -6,6 +6,7 @@ import {
   emailSendLog,
   fornecedores,
   leads,
+  whatsappSendLog,
 } from "../db/schema.js";
 import { sendEmail } from "./resend.service.js";
 import { runEmailSearch } from "./email-search.service.js";
@@ -13,6 +14,7 @@ import { classifyLead } from "../utils/email-category.js";
 import { getSource } from "./data-sources/index.js";
 import { logger } from "../utils/logger.js";
 import { mergePhones, isMobilePhone, parsePhoneList } from "../utils/phone.js";
+import { sendCampaignWhatsApp, isConnected } from "./whatsapp.service.js";
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
 
@@ -408,6 +410,94 @@ export async function executeJob(jobId: number): Promise<void> {
 
       logger.info(
         `Automacao "${job.name}" concluida: ${leadsAdded} leads adicionados, ${leadsSkipped} ignorados de ${emailsFound} encontrados`
+      );
+
+    // ========== WHATSAPP SEND ==========
+    } else if (job.jobType === "whatsapp_send") {
+      const connected = await isConnected();
+      if (!connected) {
+        throw new Error("WhatsApp não conectado");
+      }
+
+      // Import template selector
+      const { getTemplateForLead } = await import("./whatsapp-campaign.service.js");
+
+      // Query leads matching criteria: has mobile, never WPP'd (or whatsappSentCount < sequence)
+      const conditions = [
+        eq(leads.temCelular, true),
+        isNotNull(leads.telefones),
+        eq(leads.whatsappSentCount, 0),
+      ];
+      if (job.targetCategory && job.targetCategory !== "all") {
+        conditions.push(eq(leads.categoria, job.targetCategory));
+      }
+      // Also exclude opted-out leads
+      conditions.push(sql`${leads.whatsappSentCount} >= 0`);
+
+      const wppCandidates = await db
+        .select()
+        .from(leads)
+        .where(and(...conditions))
+        .limit(job.maxEmailsPerRun);
+
+      emailsFound = wppCandidates.length;
+      let wppSent = 0;
+      let wppFailed = 0;
+
+      const delayMs = (job.searchQuantity || 300) * 1000; // searchQuantity = delay in seconds (default 5 min)
+
+      logger.info(
+        `WhatsApp Job "${job.name}": ${wppCandidates.length} leads, delay=${delayMs / 1000}s`
+      );
+
+      for (const lead of wppCandidates) {
+        try {
+          const tpl = getTemplateForLead(lead, 1);
+          const success = await sendCampaignWhatsApp(lead, tpl.name, tpl.body, 1);
+          if (success) {
+            wppSent++;
+          } else {
+            wppFailed++;
+          }
+        } catch (err: any) {
+          logger.error(`WhatsApp Job send error for ${lead.cnpj}: ${err.message}`);
+          wppFailed++;
+        }
+
+        // Delay between messages
+        if (wppSent + wppFailed < wppCandidates.length) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+
+      emailsSent = wppSent;
+      emailsFailed = wppFailed;
+
+      const now = new Date().toISOString();
+      await db.update(automationRunLog)
+        .set({
+          completedAt: now,
+          status: wppFailed > 0 && wppSent === 0 ? "failed" : "completed",
+          emailsFound,
+          emailsSent: wppSent,
+          emailsFailed: wppFailed,
+          emailsSkipped: 0,
+        })
+        .where(eq(automationRunLog.id, runLogId));
+
+      const nextRun = new Date(Date.now() + getIntervalMs(job));
+      await db.update(automationJobs)
+        .set({
+          lastRunAt: now,
+          nextRunAt: nextRun.toISOString(),
+          lastRunStatus: wppFailed > 0 && wppSent === 0 ? "failed" : "success",
+          lastRunStats: JSON.stringify({ found: emailsFound, sent: wppSent, failed: wppFailed }),
+          updatedAt: now,
+        })
+        .where(eq(automationJobs.id, jobId));
+
+      logger.info(
+        `WhatsApp Job "${job.name}" concluido: ${wppSent} enviados, ${wppFailed} falharam de ${emailsFound} elegíveis`
       );
 
     // ========== EMAIL SEND (original flow) ==========
