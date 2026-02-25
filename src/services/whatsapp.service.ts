@@ -6,7 +6,7 @@ import { logger } from "../utils/logger.js";
 import { isValidBrazilianPhone } from "../utils/phone.js";
 
 const instanceName = () => env.EVOLUTION_INSTANCE_NAME;
-const baseUrl = () => env.EVOLUTION_API_URL || "";
+const baseUrl = () => (env.EVOLUTION_API_URL || "").replace(/\/+$/, "");
 const apiKey = () => env.EVOLUTION_API_KEY || "";
 
 async function evoFetch(
