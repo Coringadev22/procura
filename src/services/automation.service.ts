@@ -422,9 +422,9 @@ export async function executeJob(jobId: number): Promise<void> {
       // Import template selector
       const { getTemplateForLead } = await import("./whatsapp-campaign.service.js");
 
-      // Query leads matching criteria: has mobile, never WPP'd (or whatsappSentCount < sequence)
+      // Query leads matching criteria: has WhatsApp, never WPP'd
       const conditions = [
-        eq(leads.temCelular, true),
+        eq(leads.temWhatsapp, true),
         isNotNull(leads.telefones),
         eq(leads.whatsappSentCount, 0),
       ];

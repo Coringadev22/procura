@@ -358,4 +358,108 @@ export async function leadsRoutes(app: FastifyInstance) {
 
     return { needsFix: noName.length, fixed, deleted, failed };
   });
+
+  // Background WhatsApp validation state
+  let waValidationRunning = false;
+  let waValidationProgress = { total: 0, processed: 0, validated: 0, failed: 0, startedAt: null as string | null };
+
+  // Validate WhatsApp numbers in background (fire-and-forget)
+  app.post<{ Querystring: { limit?: string } }>("/api/leads/validate-whatsapp-background", async (request) => {
+    if (waValidationRunning) {
+      return { running: true, progress: waValidationProgress };
+    }
+
+    const limit = parseInt(request.query.limit || "500", 10);
+    const { checkWhatsAppNumbersBatched, isConnected } = await import("../services/whatsapp.service.js");
+
+    const connected = await isConnected();
+    if (!connected) {
+      return { error: "WhatsApp nao conectado" };
+    }
+
+    // Get leads with phones that haven't been WhatsApp-validated yet
+    const needsValidation = await db.select().from(leads).where(
+      and(
+        eq(leads.temWhatsapp, false),
+        isNotNull(leads.telefones),
+        sql`${leads.telefones} != ''`
+      )
+    );
+
+    const batch = needsValidation.slice(0, limit);
+
+    waValidationRunning = true;
+    waValidationProgress = {
+      total: batch.length,
+      processed: 0,
+      validated: 0,
+      failed: 0,
+      startedAt: new Date().toISOString(),
+    };
+
+    // Fire and forget
+    (async () => {
+      // Collect all unique phones across all leads
+      const leadPhoneMap = new Map<string, number[]>(); // phone -> leadIds
+
+      for (const lead of batch) {
+        const phones = parsePhoneList(lead.telefones!);
+        for (const phone of phones) {
+          const existing = leadPhoneMap.get(phone) || [];
+          existing.push(lead.id);
+          leadPhoneMap.set(phone, existing);
+        }
+      }
+
+      const allPhones = [...leadPhoneMap.keys()];
+
+      // Check all phones against WhatsApp in batches
+      let whatsappPhones: Map<string, boolean>;
+      try {
+        whatsappPhones = await checkWhatsAppNumbersBatched(allPhones, 50);
+      } catch {
+        waValidationProgress.failed = batch.length;
+        waValidationRunning = false;
+        return;
+      }
+
+      // Find which leads have at least one WhatsApp phone
+      const leadsWithWhatsApp = new Set<number>();
+      for (const [phone, exists] of whatsappPhones) {
+        if (exists) {
+          const leadIds = leadPhoneMap.get(phone) || [];
+          for (const id of leadIds) {
+            leadsWithWhatsApp.add(id);
+          }
+        }
+      }
+
+      // Update leads
+      for (const lead of batch) {
+        try {
+          const hasWhatsApp = leadsWithWhatsApp.has(lead.id);
+          await db.update(leads)
+            .set({ temWhatsapp: hasWhatsApp })
+            .where(eq(leads.id, lead.id));
+          if (hasWhatsApp) waValidationProgress.validated++;
+        } catch {
+          waValidationProgress.failed++;
+        }
+        waValidationProgress.processed++;
+      }
+
+      waValidationRunning = false;
+    })();
+
+    return {
+      started: true,
+      total: batch.length,
+      totalPending: needsValidation.length,
+    };
+  });
+
+  // Check WhatsApp validation progress
+  app.get("/api/leads/validate-whatsapp-progress", async () => {
+    return { running: waValidationRunning, progress: waValidationProgress };
+  });
 }

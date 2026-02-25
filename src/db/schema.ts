@@ -199,6 +199,7 @@ export const leads = pgTable("leads", {
   emailSentAt: text("email_sent_at"),
   emailSentCount: integer("email_sent_count").notNull().default(0),
   temCelular: boolean("tem_celular").notNull().default(false),
+  temWhatsapp: boolean("tem_whatsapp").notNull().default(false),
   whatsappSentAt: text("whatsapp_sent_at"),
   whatsappSentCount: integer("whatsapp_sent_count").notNull().default(0),
   createdAt: text("created_at")

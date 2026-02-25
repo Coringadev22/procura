@@ -415,6 +415,9 @@ const HTML = `<!DOCTYPE html>
         <button class="filter-btn" id="filter-empresa" onclick="filterLeads('empresa')">Empresas</button>
         <button class="filter-btn" id="filter-contabilidade" onclick="filterLeads('contabilidade')">Contabilidades</button>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
+        <button class="filter-btn" id="filter-com_whatsapp" onclick="filterLeads('com_whatsapp')" style="color:#25d366">Com WA</button>
+        <button class="filter-btn" id="filter-wa_enviado" onclick="filterLeads('wa_enviado')" style="color:#25d366">WA Enviado</button>
+        <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
         <input type="text" id="leads-cnae-filter" placeholder="Filtrar por CNAE / Atividade..." oninput="leadPage=1;renderLeads()" style="padding:6px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px;width:200px">
         <select id="leads-uf-filter" onchange="leadPage=1;renderLeads()" style="padding:6px 10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:12px"><option value="all">Todos UFs</option><option value="AC">AC</option><option value="AL">AL</option><option value="AM">AM</option><option value="AP">AP</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MG">MG</option><option value="MS">MS</option><option value="MT">MT</option><option value="PA">PA</option><option value="PB">PB</option><option value="PE">PE</option><option value="PI">PI</option><option value="PR">PR</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RO">RO</option><option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option><option value="SE">SE</option><option value="SP">SP</option><option value="TO">TO</option></select>
         <span style="border-left:1px solid #334155;height:24px;margin:0 4px"></span>
@@ -748,15 +751,17 @@ const HTML = `<!DOCTYPE html>
           <h2>Preparacao de Telefones</h2>
         </div>
         <p style="color:#64748b;font-size:13px;margin-bottom:12px">Normaliza telefones existentes (formato E.164) e enriquece leads sem telefone via CNPJ lookup para tornar elegiveis ao WhatsApp.</p>
-        <div id="phone-stats" style="margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div id="phone-stats" style="margin-bottom:12px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
           <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#f8fafc" id="ps-total">-</div><div style="font-size:10px;color:#64748b">Total leads</div></div>
-          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#22c55e" id="ps-mobile">-</div><div style="font-size:10px;color:#64748b">Com celular</div></div>
           <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#3b82f6" id="ps-phone">-</div><div style="font-size:10px;color:#64748b">Com telefone</div></div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#22c55e" id="ps-mobile">-</div><div style="font-size:10px;color:#64748b">Com celular</div></div>
+          <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#25d366" id="ps-whatsapp">-</div><div style="font-size:10px;color:#64748b">Com WhatsApp</div></div>
           <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#f59e0b" id="ps-nophone">-</div><div style="font-size:10px;color:#64748b">Sem telefone</div></div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-sm" style="background:#3b82f6;color:#fff" onclick="normalizePhones()">1. Normalizar Telefones</button>
-          <button class="btn btn-sm" style="background:#22c55e;color:#fff" onclick="enrichPhonesBackground()">2. Enriquecer Sem Telefone</button>
+          <button class="btn btn-sm" style="background:#3b82f6;color:#fff" onclick="normalizePhones()">1. Normalizar</button>
+          <button class="btn btn-sm" style="background:#22c55e;color:#fff" onclick="enrichPhonesBackground()">2. Enriquecer</button>
+          <button class="btn btn-sm" style="background:#25d366;color:#fff" onclick="validateWhatsApp()">3. Validar WhatsApp</button>
           <button class="btn btn-sm" style="background:#334155;color:#94a3b8" onclick="loadPhoneStats()">Atualizar</button>
         </div>
         <div id="phone-action-result" style="margin-top:8px;font-size:13px;color:#64748b"></div>
@@ -1259,6 +1264,7 @@ function filterLeads(f) {
   if (btn) {
     if (f === 'empresa') btn.classList.add('active-green');
     else if (f === 'contabilidade') btn.classList.add('active-orange');
+    else if (f === 'com_whatsapp' || f === 'wa_enviado') btn.classList.add('active-green');
     else btn.classList.add('active');
   }
   renderLeads();
@@ -1282,6 +1288,9 @@ function renderLeads() {
 
   const emailsSentTotal = leads.reduce(function(s,l){ return s + (Number(l.emailSentCount) || 0); }, 0);
   const leadsEmailed = leads.filter(function(l){ return (Number(l.emailSentCount) || 0) > 0; }).length;
+  const whatsappSentTotal = leads.reduce(function(s,l){ return s + (Number(l.whatsappSentCount) || 0); }, 0);
+  const leadsWhatsapped = leads.filter(function(l){ return (Number(l.whatsappSentCount) || 0) > 0; }).length;
+  const leadsWithWhatsApp = leads.filter(function(l){ return l.temWhatsapp; }).length;
 
   statsEl.innerHTML =
     '<div class="stat"><div class="stat-value blue">' + leads.length + '</div><div class="stat-label">Total de leads</div></div>' +
@@ -1289,11 +1298,16 @@ function renderLeads() {
     '<div class="stat"><div class="stat-value" style="color:#22c55e">' + empresas + '</div><div class="stat-label">Empresas</div></div>' +
     '<div class="stat"><div class="stat-value" style="color:#f97316">' + contabs + '</div><div class="stat-label">Contabilidades</div></div>' +
     '<div class="stat"><div class="stat-value" style="color:#8b5cf6">' + emailsSentTotal + '</div><div class="stat-label">Emails enviados</div></div>' +
-    '<div class="stat"><div class="stat-value" style="color:#8b5cf6">' + leadsEmailed + '</div><div class="stat-label">Leads contatados</div></div>';
+    '<div class="stat"><div class="stat-value" style="color:#25d366">' + leadsWithWhatsApp + '</div><div class="stat-label">Tem WhatsApp</div></div>' +
+    '<div class="stat"><div class="stat-value" style="color:#25d366">' + whatsappSentTotal + '</div><div class="stat-label">WA enviados</div></div>';
 
   actionsEl.style.display = leads.length > 0 ? 'flex' : 'none';
 
-  let filtered = leadFilter === 'todos' ? leads.slice() : leads.filter(l => l.categoria === leadFilter);
+  let filtered;
+  if (leadFilter === 'todos') { filtered = leads.slice(); }
+  else if (leadFilter === 'com_whatsapp') { filtered = leads.filter(function(l){ return l.temWhatsapp; }); }
+  else if (leadFilter === 'wa_enviado') { filtered = leads.filter(function(l){ return (Number(l.whatsappSentCount) || 0) > 0; }); }
+  else { filtered = leads.filter(function(l){ return l.categoria === leadFilter; }); }
   const cnaeFilter = (document.getElementById('leads-cnae-filter')?.value || '').toLowerCase().trim();
   if (cnaeFilter) filtered = filtered.filter(l => (l.cnaePrincipal || '').toLowerCase().includes(cnaeFilter));
   const ufFilter = document.getElementById('leads-uf-filter')?.value || 'all';
@@ -1318,6 +1332,7 @@ function renderLeads() {
     else if (sc === 'fonte') { va = (a.fonte || a.origem || '').toLowerCase(); vb = (b.fonte || b.origem || '').toLowerCase(); }
     else if (sc === 'telefone') { va = (a.telefones || '').toLowerCase(); vb = (b.telefones || '').toLowerCase(); }
     else if (sc === 'enviado') { va = Number(a.emailSentCount) || 0; vb = Number(b.emailSentCount) || 0; return (va - vb) * sd; }
+    else if (sc === 'whatsapp') { va = Number(a.whatsappSentCount) || 0; vb = Number(b.whatsappSentCount) || 0; return (va - vb) * sd; }
     else { va = (a.razaoSocial || '').toLowerCase(); vb = (b.razaoSocial || '').toLowerCase(); }
     if (va < vb) return -1 * sd;
     if (va > vb) return 1 * sd;
@@ -1347,7 +1362,8 @@ function renderLeads() {
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'telefone\\')">Telefone' + sortIcon('telefone') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'fonte\\')">Fonte' + sortIcon('fonte') + '</th>' +
     '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'valor\\')">Valor' + sortIcon('valor') + '</th>' +
-    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'enviado\\')">Enviado' + sortIcon('enviado') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'enviado\\')">Email' + sortIcon('enviado') + '</th>' +
+    '<th style="cursor:pointer;user-select:none" onclick="sortLeads(\\'whatsapp\\')">WhatsApp' + sortIcon('whatsapp') + '</th>' +
     '<th></th>' +
     '</tr></thead><tbody>';
 
@@ -1363,6 +1379,7 @@ function renderLeads() {
       '<td><span class="badge ' + fonteBadge(l.fonte || l.origem) + '">' + fonteLabel(l.fonte || l.origem || '-') + '</span></td>' +
       '<td style="font-size:12px;color:#22c55e;font-weight:600">' + money(l.valorHomologado) + '</td>' +
       '<td>' + ((Number(l.emailSentCount)||0) > 0 ? '<span class="badge badge-green">' + l.emailSentCount + 'x</span>' : '<span class="badge badge-gray">N/A</span>') + '</td>' +
+      '<td>' + ((Number(l.whatsappSentCount)||0) > 0 ? '<span class="badge" style="background:#052e16;color:#25d366">' + l.whatsappSentCount + 'x</span>' : (l.temWhatsapp ? '<span class="badge" style="background:#0a2a1a;color:#25d366">WA</span>' : '<span class="badge badge-gray">N/A</span>')) + '</td>' +
       '<td><button class="btn btn-xs btn-red" onclick="removeLead(\\''+l.cnpj+'\\')">X</button></td>' +
       '</tr>';
   });
@@ -1389,7 +1406,11 @@ function renderLeads() {
 }
 
 function getFilteredLeads() {
-  var f = leadFilter === 'todos' ? leads.slice() : leads.filter(l => l.categoria === leadFilter);
+  var f;
+  if (leadFilter === 'todos') f = leads.slice();
+  else if (leadFilter === 'com_whatsapp') f = leads.filter(function(l){ return l.temWhatsapp; });
+  else if (leadFilter === 'wa_enviado') f = leads.filter(function(l){ return (Number(l.whatsappSentCount)||0) > 0; });
+  else f = leads.filter(function(l){ return l.categoria === leadFilter; });
   var ufF = document.getElementById('leads-uf-filter')?.value || 'all';
   if (ufF && ufF !== 'all') f = f.filter(l => (l.uf || '').toUpperCase() === ufF);
   var cnaeF = (document.getElementById('leads-cnae-filter')?.value || '').toLowerCase().trim();
@@ -1407,9 +1428,9 @@ function copyLeadEmails() {
 function exportLeadsCSV() {
   const source = getFilteredLeads();
   if (source.length === 0) return showToast('Nenhum lead para exportar', true);
-  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Fonte,Categoria,Valor Homologado,Emails Enviados';
+  const header = 'CNPJ,Razao Social,Email,Telefone,Municipio,UF,Atividade (CNAE),Fonte,Categoria,Valor Homologado,Emails Enviados,WhatsApp Enviados,Tem WhatsApp';
   const rows = source.map(l => {
-    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.fonte||l.origem||'', l.categoria||'', l.valorHomologado||'', l.emailSentCount||0].join(',');
+    return [l.cnpj, '"'+(l.razaoSocial||'')+'"', l.email||'', '"'+(l.telefones||'')+'"', '"'+(l.municipio||'')+'"', l.uf||'', '"'+(l.cnaePrincipal||'')+'"', l.fonte||l.origem||'', l.categoria||'', l.valorHomologado||'', l.emailSentCount||0, l.whatsappSentCount||0, l.temWhatsapp?'Sim':'Nao'].join(',');
   });
   const csv = header + '\\n' + rows.join('\\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -2750,13 +2771,14 @@ async function sendWaTest() {
 
 async function loadPhoneStats() {
   try {
-    const data = await apiFetch('/api/leads/stats');
     const all = await apiFetch('/api/leads');
     const withPhone = all.filter(l => l.telefones && l.telefones.trim() !== '').length;
     const withMobile = all.filter(l => l.temCelular).length;
+    const withWhatsApp = all.filter(l => l.temWhatsapp).length;
     document.getElementById('ps-total').textContent = all.length;
-    document.getElementById('ps-mobile').textContent = withMobile;
     document.getElementById('ps-phone').textContent = withPhone;
+    document.getElementById('ps-mobile').textContent = withMobile;
+    document.getElementById('ps-whatsapp').textContent = withWhatsApp;
     document.getElementById('ps-nophone').textContent = all.length - withPhone;
   } catch(e) {
     console.error('loadPhoneStats error:', e);
@@ -2805,6 +2827,49 @@ function startEnrichPolling() {
       if (!data.running) {
         clearInterval(enrichPolling);
         enrichPolling = null;
+        loadPhoneStats();
+      }
+    } catch(e) { console.error(e); }
+  }, 5000);
+}
+
+// ============ WHATSAPP VALIDATION ============
+
+let waValidPolling = null;
+async function validateWhatsApp() {
+  const result = document.getElementById('phone-action-result');
+  result.innerHTML = '<span style="color:#25d366">Validando numeros no WhatsApp...</span>';
+  try {
+    const data = await apiPost('/api/leads/validate-whatsapp-background?limit=500', {});
+    if (data.error) {
+      result.innerHTML = '<span style="color:#ef4444">' + data.error + '</span>';
+      return;
+    }
+    if (data.running) {
+      result.innerHTML = '<span style="color:#f59e0b">Ja em andamento!</span>';
+    } else {
+      result.innerHTML = '<span style="color:#25d366">Iniciado! ' + data.total + ' leads para validar (de ' + data.totalPending + ' pendentes)</span>';
+    }
+    startWaValidationPolling();
+  } catch(e) { result.innerHTML = '<span style="color:#ef4444">Erro: ' + e.message + '</span>'; }
+}
+
+function startWaValidationPolling() {
+  const bar = document.getElementById('phone-enrich-progress');
+  bar.style.display = 'block';
+  if (waValidPolling) clearInterval(waValidPolling);
+  waValidPolling = setInterval(async () => {
+    try {
+      const data = await apiFetch('/api/leads/validate-whatsapp-progress');
+      const p = data.progress;
+      const pct = p.total > 0 ? Math.round((p.processed / p.total) * 100) : 0;
+      document.getElementById('pe-label').textContent = data.running ? 'Validando WhatsApp... (' + p.validated + ' confirmados)' : 'Concluido! ' + p.validated + ' com WhatsApp';
+      document.getElementById('pe-count').textContent = p.processed + '/' + p.total;
+      document.getElementById('pe-bar').style.width = pct + '%';
+      document.getElementById('pe-bar').style.background = '#25d366';
+      if (!data.running) {
+        clearInterval(waValidPolling);
+        waValidPolling = null;
         loadPhoneStats();
       }
     } catch(e) { console.error(e); }

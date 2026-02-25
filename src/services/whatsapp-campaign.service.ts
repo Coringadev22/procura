@@ -217,7 +217,7 @@ async function executeCampaign(): Promise<WhatsAppCampaignResult> {
     .where(
       and(
         eq(leads.whatsappSentCount, 1),
-        eq(leads.temCelular, true),
+        eq(leads.temWhatsapp, true),
         isNotNull(leads.telefones),
         lte(leads.whatsappSentAt, sevenDaysAgo)
       )
@@ -259,7 +259,7 @@ async function executeCampaign(): Promise<WhatsAppCampaignResult> {
       .where(
         and(
           eq(leads.whatsappSentCount, 0),
-          eq(leads.temCelular, true),
+          eq(leads.temWhatsapp, true),
           isNotNull(leads.telefones),
           sql`${leads.emailSentCount} >= 1`
         )

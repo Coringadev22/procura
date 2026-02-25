@@ -35,10 +35,10 @@ export async function whatsappRoutes(app: FastifyInstance) {
           )
         );
 
-      const totalLeadsWithPhone = await db
+      const totalLeadsWithWhatsApp = await db
         .select({ count: sql<number>`count(*)` })
         .from(leads)
-        .where(eq(leads.temCelular, true));
+        .where(eq(leads.temWhatsapp, true));
 
       return {
         enabled: true,
@@ -46,7 +46,8 @@ export async function whatsappRoutes(app: FastifyInstance) {
         state,
         sentToday: Number(todayCount[0]?.count ?? 0),
         dailyLimit: env.WHATSAPP_DAILY_LIMIT,
-        leadsWithMobile: Number(totalLeadsWithPhone[0]?.count ?? 0),
+        leadsWithMobile: Number(totalLeadsWithWhatsApp[0]?.count ?? 0),
+        leadsWithWhatsApp: Number(totalLeadsWithWhatsApp[0]?.count ?? 0),
       };
     } catch (err: any) {
       return { enabled: true, connected: false, state: "error", error: err.message };
@@ -139,14 +140,14 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const totalWithMobile = await db
       .select({ count: sql<number>`count(*)` })
       .from(leads)
-      .where(eq(leads.temCelular, true));
+      .where(eq(leads.temWhatsapp, true));
 
     const neverContacted = await db
       .select({ count: sql<number>`count(*)` })
       .from(leads)
       .where(
         and(
-          eq(leads.temCelular, true),
+          eq(leads.temWhatsapp, true),
           eq(leads.whatsappSentCount, 0),
           sql`${leads.emailSentCount} >= 1`
         )
@@ -157,7 +158,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
       .from(leads)
       .where(
         and(
-          eq(leads.temCelular, true),
+          eq(leads.temWhatsapp, true),
           eq(leads.whatsappSentCount, 1)
         )
       );
@@ -167,7 +168,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
       .from(leads)
       .where(
         and(
-          eq(leads.temCelular, true),
+          eq(leads.temWhatsapp, true),
           sql`${leads.whatsappSentCount} >= 2`
         )
       );
@@ -226,7 +227,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
           if (["SAIR", "PARAR", "CANCELAR", "STOP"].includes(text) && from) {
             // Find lead by phone and mark as opted out (set whatsappSentCount = -1)
             const phone = from.startsWith("55") ? `+${from}` : `+55${from}`;
-            const allLeads = await db.select().from(leads).where(eq(leads.temCelular, true));
+            const allLeads = await db.select().from(leads).where(eq(leads.temWhatsapp, true));
             for (const lead of allLeads) {
               if (lead.telefones?.includes(phone)) {
                 await db.update(leads)

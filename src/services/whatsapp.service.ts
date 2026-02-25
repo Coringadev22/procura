@@ -3,7 +3,7 @@ import { db } from "../config/database.js";
 import { whatsappSendLog, leads } from "../db/schema.js";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
-import { isMobilePhone } from "../utils/phone.js";
+import { isValidBrazilianPhone } from "../utils/phone.js";
 
 const instanceName = () => env.EVOLUTION_INSTANCE_NAME;
 const baseUrl = () => env.EVOLUTION_API_URL || "";
@@ -96,14 +96,75 @@ export async function disconnectInstance(): Promise<void> {
   await evoFetch(`/instance/logout/${instanceName()}`, "DELETE");
 }
 
+/**
+ * Check which phone numbers have WhatsApp accounts.
+ * Uses Evolution API POST /chat/whatsappNumbers/{instance}
+ * @returns Map of phone -> boolean (has WhatsApp)
+ */
+export async function checkWhatsAppNumbers(
+  phones: string[]
+): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>();
+  if (phones.length === 0) return result;
+
+  const numbers = phones.map((p) => p.replace("+", ""));
+
+  try {
+    const data = await evoFetch(
+      `/chat/whatsappNumbers/${instanceName()}`,
+      "POST",
+      { numbers }
+    );
+
+    const items = Array.isArray(data)
+      ? data
+      : data?.response || data?.message || [];
+
+    for (const item of items) {
+      const num = item.number || item.jid?.replace("@s.whatsapp.net", "");
+      if (!num) continue;
+      const phone = num.startsWith("+") ? num : "+" + num;
+      result.set(phone, item.exists === true);
+    }
+  } catch (err: any) {
+    logger.error(`WhatsApp number check error: ${err.message}`);
+  }
+
+  return result;
+}
+
+/**
+ * Check WhatsApp numbers in batches to avoid API limits.
+ * @param batchSize How many per API call (default 50)
+ */
+export async function checkWhatsAppNumbersBatched(
+  phones: string[],
+  batchSize = 50
+): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>();
+
+  for (let i = 0; i < phones.length; i += batchSize) {
+    const batch = phones.slice(i, i + batchSize);
+    const batchResult = await checkWhatsAppNumbers(batch);
+    for (const [phone, exists] of batchResult) {
+      result.set(phone, exists);
+    }
+    if (i + batchSize < phones.length) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+
+  return result;
+}
+
 /** Send a text message via WhatsApp */
 export async function sendWhatsAppMessage(
   phone: string,
   text: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  // Ensure phone is mobile format (WhatsApp requires mobile)
-  if (!isMobilePhone(phone)) {
-    return { success: false, error: "Not a mobile number" };
+  // Ensure phone is a valid Brazilian phone (mobile or landline with WhatsApp)
+  if (!isValidBrazilianPhone(phone)) {
+    return { success: false, error: "Not a valid Brazilian phone number" };
   }
 
   // Remove + prefix for Evolution API (expects 5511999998888)
@@ -141,10 +202,10 @@ export async function sendCampaignWhatsApp(
 ): Promise<boolean> {
   if (!lead.telefones) return false;
 
-  // Get first mobile phone
+  // Get first valid phone (mobile or landline with WhatsApp)
   const phones = lead.telefones.split(",").map((p) => p.trim());
-  const mobilePhone = phones.find(isMobilePhone);
-  if (!mobilePhone) return false;
+  const validPhone = phones.find(isValidBrazilianPhone);
+  if (!validPhone) return false;
 
   // Replace template variables
   const vars: Record<string, string> = {
@@ -164,12 +225,12 @@ export async function sendCampaignWhatsApp(
   }
 
   try {
-    const result = await sendWhatsAppMessage(mobilePhone, messageText);
+    const result = await sendWhatsAppMessage(validPhone, messageText);
 
     // Log to database
     await db.insert(whatsappSendLog).values({
       leadId: lead.id,
-      recipientPhone: mobilePhone,
+      recipientPhone: validPhone,
       recipientCnpj: lead.cnpj,
       recipientName: lead.razaoSocial || lead.nomeFantasia || null,
       templateName,
@@ -197,7 +258,7 @@ export async function sendCampaignWhatsApp(
     try {
       await db.insert(whatsappSendLog).values({
         leadId: lead.id,
-        recipientPhone: mobilePhone,
+        recipientPhone: validPhone,
         recipientCnpj: lead.cnpj,
         recipientName: lead.razaoSocial || lead.nomeFantasia || null,
         templateName,
