@@ -14,7 +14,8 @@ import { classifyLead } from "../utils/email-category.js";
 import { getSource } from "./data-sources/index.js";
 import { logger } from "../utils/logger.js";
 import { mergePhones, isMobilePhone, parsePhoneList } from "../utils/phone.js";
-import { sendCampaignWhatsApp, isConnected } from "./whatsapp.service.js";
+import { sendCampaignWhatsApp, isConnected, checkWhatsAppNumbersBatched } from "./whatsapp.service.js";
+import { lookupCnpj } from "./cnpj-lookup.service.js";
 
 const activeTimers = new Map<number, NodeJS.Timeout>();
 
@@ -156,6 +157,194 @@ export async function executeJob(jobId: number): Promise<void> {
   let emailsSkipped = 0;
 
   try {
+    // ========== ENRICH PHONES ==========
+    if (job.jobType === "enrich_phones") {
+      const limit = job.maxEmailsPerRun;
+
+      const needsEnrich = await db.select().from(leads).where(
+        sql`(${leads.telefones} IS NULL OR ${leads.telefones} = '') AND length(${leads.cnpj}) = 14`
+      );
+
+      // Sort: emailed leads first (most valuable to enrich)
+      needsEnrich.sort((a, b) => (b.emailSentCount ?? 0) - (a.emailSentCount ?? 0));
+      const batch = needsEnrich.slice(0, limit);
+
+      emailsFound = batch.length;
+      let enriched = 0;
+      let enrichFailed = 0;
+
+      for (const lead of batch) {
+        try {
+          const data = await lookupCnpj(lead.cnpj);
+          const updates: Record<string, any> = {};
+
+          if (data.telefones) {
+            const nPhones = mergePhones(data.telefones);
+            const hasMob = nPhones ? parsePhoneList(nPhones).some(isMobilePhone) : false;
+            updates.telefones = nPhones;
+            updates.temCelular = hasMob;
+          }
+          if (data.email && !lead.email) updates.email = data.email.toLowerCase();
+          if (data.razaoSocial && !lead.razaoSocial) updates.razaoSocial = data.razaoSocial;
+          if (data.nomeFantasia && !lead.nomeFantasia) updates.nomeFantasia = data.nomeFantasia;
+          if (data.municipio && !lead.municipio) updates.municipio = data.municipio;
+          if (data.uf && !lead.uf) updates.uf = data.uf;
+
+          if (Object.keys(updates).length > 0) {
+            await db.update(leads).set(updates).where(eq(leads.id, lead.id));
+            if (updates.telefones) enriched++;
+          }
+        } catch (err: any) {
+          logger.error(`Enrich phones error for ${lead.cnpj}: ${err.message}`);
+          enrichFailed++;
+        }
+      }
+
+      emailsSent = enriched;
+      emailsFailed = enrichFailed;
+
+      const now = new Date().toISOString();
+      await db.update(automationRunLog)
+        .set({
+          completedAt: now,
+          status: enrichFailed > 0 && enriched === 0 ? "failed" : "completed",
+          emailsFound: batch.length,
+          emailsSent: enriched,
+          emailsFailed: enrichFailed,
+          emailsSkipped: 0,
+        })
+        .where(eq(automationRunLog.id, runLogId));
+
+      const nextRun = new Date(Date.now() + getIntervalMs(job));
+      await db.update(automationJobs)
+        .set({
+          lastRunAt: now,
+          nextRunAt: nextRun.toISOString(),
+          lastRunStatus: enrichFailed > 0 && enriched === 0 ? "failed" : "success",
+          lastRunStats: JSON.stringify({
+            totalPending: needsEnrich.length,
+            processed: batch.length,
+            enriched,
+            failed: enrichFailed,
+          }),
+          updatedAt: now,
+        })
+        .where(eq(automationJobs.id, jobId));
+
+      logger.info(
+        `Enrich Phones "${job.name}" concluido: ${enriched} enriquecidos, ${enrichFailed} falharam de ${batch.length} processados (${needsEnrich.length} pendentes total)`
+      );
+
+      await scheduleJob(jobId);
+      return;
+    }
+
+    // ========== WHATSAPP VALIDATE ==========
+    if (job.jobType === "whatsapp_validate") {
+      const connected = await isConnected();
+      if (!connected) {
+        throw new Error("WhatsApp nao conectado");
+      }
+
+      const limit = job.maxEmailsPerRun;
+
+      const needsValidation = await db.select().from(leads).where(
+        and(
+          eq(leads.temWhatsapp, false),
+          isNotNull(leads.telefones),
+          sql`${leads.telefones} != ''`
+        )
+      );
+
+      const batch = needsValidation.slice(0, limit);
+      emailsFound = batch.length;
+
+      // Collect all unique phones across all leads
+      const leadPhoneMap = new Map<string, number[]>();
+      for (const lead of batch) {
+        const phones = parsePhoneList(lead.telefones!);
+        for (const phone of phones) {
+          const existing = leadPhoneMap.get(phone) || [];
+          existing.push(lead.id);
+          leadPhoneMap.set(phone, existing);
+        }
+      }
+
+      const allPhones = [...leadPhoneMap.keys()];
+
+      // Check all phones against WhatsApp in batches
+      const whatsappPhones = await checkWhatsAppNumbersBatched(allPhones, 50);
+
+      // Find which leads have at least one WhatsApp phone
+      const leadsWithWhatsApp = new Set<number>();
+      for (const [phone, exists] of whatsappPhones) {
+        if (exists) {
+          const leadIds = leadPhoneMap.get(phone) || [];
+          for (const id of leadIds) {
+            leadsWithWhatsApp.add(id);
+          }
+        }
+      }
+
+      // Update leads
+      let validated = 0;
+      let noWhatsApp = 0;
+      let validateFailed = 0;
+
+      for (const lead of batch) {
+        try {
+          const hasWhatsApp = leadsWithWhatsApp.has(lead.id);
+          await db.update(leads)
+            .set({ temWhatsapp: hasWhatsApp })
+            .where(eq(leads.id, lead.id));
+          if (hasWhatsApp) validated++;
+          else noWhatsApp++;
+        } catch {
+          validateFailed++;
+        }
+      }
+
+      emailsSent = validated;
+      emailsFailed = validateFailed;
+
+      const now = new Date().toISOString();
+      await db.update(automationRunLog)
+        .set({
+          completedAt: now,
+          status: validateFailed > 0 && validated === 0 ? "failed" : "completed",
+          emailsFound: batch.length,
+          emailsSent: validated,
+          emailsFailed: validateFailed,
+          emailsSkipped: noWhatsApp,
+        })
+        .where(eq(automationRunLog.id, runLogId));
+
+      const nextRun = new Date(Date.now() + getIntervalMs(job));
+      await db.update(automationJobs)
+        .set({
+          lastRunAt: now,
+          nextRunAt: nextRun.toISOString(),
+          lastRunStatus: validateFailed > 0 && validated === 0 ? "failed" : "success",
+          lastRunStats: JSON.stringify({
+            totalPending: needsValidation.length,
+            checked: batch.length,
+            validated,
+            noWhatsApp,
+            failed: validateFailed,
+            phonesChecked: allPhones.length,
+          }),
+          updatedAt: now,
+        })
+        .where(eq(automationJobs.id, jobId));
+
+      logger.info(
+        `WhatsApp Validate "${job.name}" concluido: ${validated} com WhatsApp, ${noWhatsApp} sem, ${validateFailed} falharam de ${batch.length} verificados`
+      );
+
+      await scheduleJob(jobId);
+      return;
+    }
+
     // 1. Gather recipients from search and/or fornecedores
     interface Recipient {
       email: string;
@@ -617,4 +806,42 @@ export async function executeJob(jobId: number): Promise<void> {
 
   // Reschedule
   await scheduleJob(jobId);
+}
+
+// ============ SEED DEFAULT ENRICHMENT JOBS ============
+
+export async function seedDefaultEnrichmentJobs(): Promise<void> {
+  const existingJobs = await db.select().from(automationJobs);
+  const hasEnrichPhones = existingJobs.some(j => j.jobType === "enrich_phones");
+  const hasWaValidate = existingJobs.some(j => j.jobType === "whatsapp_validate");
+
+  if (!hasEnrichPhones) {
+    const [job] = await db.insert(automationJobs).values({
+      name: "Enriquecer Telefones (auto)",
+      jobType: "enrich_phones",
+      intervalHours: 6,
+      maxEmailsPerRun: 100,
+      searchKeyword: "",
+      sourceType: "leads",
+      isActive: true,
+    }).returning({ id: automationJobs.id });
+
+    await scheduleJob(job.id);
+    logger.info(`Seed: job enrich_phones criado (id=${job.id})`);
+  }
+
+  if (!hasWaValidate) {
+    const [job] = await db.insert(automationJobs).values({
+      name: "Validar WhatsApp (auto)",
+      jobType: "whatsapp_validate",
+      intervalHours: 12,
+      maxEmailsPerRun: 200,
+      searchKeyword: "",
+      sourceType: "leads",
+      isActive: true,
+    }).returning({ id: automationJobs.id });
+
+    await scheduleJob(job.id);
+    logger.info(`Seed: job whatsapp_validate criado (id=${job.id})`);
+  }
 }

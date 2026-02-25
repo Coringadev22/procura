@@ -12,7 +12,7 @@ import { buscaEmailsRoutes } from "./routes/busca-emails.routes.js";
 import { resendRoutes } from "./routes/resend.routes.js";
 import { automationRoutes } from "./routes/automation.routes.js";
 import { leadsRoutes } from "./routes/leads.routes.js";
-import { startAutomationScheduler, cancelAllJobs } from "./services/automation.service.js";
+import { startAutomationScheduler, cancelAllJobs, seedDefaultEnrichmentJobs } from "./services/automation.service.js";
 import { seedCampaignTemplates, startDailyCampaignScheduler, stopDailyCampaignScheduler } from "./services/campaign.service.js";
 import { whatsappRoutes } from "./routes/whatsapp.routes.js";
 import { initializeInstance } from "./services/whatsapp.service.js";
@@ -56,6 +56,7 @@ try {
   await app.listen({ port: env.PORT, host: env.HOST });
 
   await startAutomationScheduler();
+  await seedDefaultEnrichmentJobs();
   await seedCampaignTemplates();
   startDailyCampaignScheduler();
 

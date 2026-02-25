@@ -823,15 +823,15 @@ const HTML = `<!DOCTYPE html>
           <input type="hidden" id="auto-edit-id" value="">
           <div class="form-row">
             <div class="form-group" style="flex:2"><label>Nome do Job</label><input type="text" id="auto-name" placeholder="Ex: Busca diaria informatica SP"></div>
-            <div class="form-group" style="flex:0.8"><label>Tipo</label><select id="auto-job-type" onchange="toggleAutoJobType()" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="populate_leads">Popular Leads</option><option value="email_send">Enviar Emails</option><option value="whatsapp_send">Enviar WhatsApp</option></select></div>
+            <div class="form-group" style="flex:0.8"><label>Tipo</label><select id="auto-job-type" onchange="toggleAutoJobType()" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="populate_leads">Popular Leads</option><option value="enrich_phones">Enriquecer Telefones</option><option value="whatsapp_validate">Validar WhatsApp</option><option value="email_send">Enviar Emails</option><option value="whatsapp_send">Enviar WhatsApp</option></select></div>
             <div class="form-group" style="flex:0.8"><label>Intervalo</label><select id="auto-interval" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="6">A cada 6h</option><option value="12">A cada 12h</option><option value="24">A cada 24h</option><option value="48">A cada 2 dias</option><option value="72">A cada 3 dias</option><option value="168">Semanal</option></select></div>
           </div>
-          <div class="form-row" style="margin-top:12px">
+          <div id="auto-search-row-1" class="form-row" style="margin-top:12px">
             <div class="form-group" style="flex:2"><label>Palavra-chave de Busca</label><input type="text" id="auto-keyword" placeholder="Ex: informatica, medicamentos..."></div>
             <div class="form-group" style="flex:0.5"><label>Estado (UF)</label><input type="text" id="auto-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase"></div>
             <div class="form-group" style="flex:0.5"><label>Qtd. Licitacoes</label><input type="number" id="auto-qty" value="20" min="3" max="200"></div>
           </div>
-          <div class="form-row" style="margin-top:12px">
+          <div id="auto-search-row-2" class="form-row" style="margin-top:12px">
             <div class="form-group"><label>Filtro CNAE (opcional)</label><input type="text" id="auto-cnae" placeholder="Ex: informatica, alimentacao..."></div>
             <div class="form-group"><label>Fonte de Dados</label><select id="auto-source" style="padding:10px 14px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;font-size:14px"><option value="pncp">PNCP Licitacoes</option><option value="pncp_contratos">PNCP Contratos</option><option value="sicaf">SICAF (Compras.gov)</option><option value="tce_rj">TCE-RJ</option><option value="tce_sp">TCE-SP (Despesas)</option><option value="diario_oficial">Diario Oficial (Querido Diario)</option><option value="ceis">CEIS (Empresas Inidoneas)</option><option value="cnep">CNEP (Empresas Punidas)</option><option value="transparencia">TransfereGov</option><option value="fornecedores">Fornecedores ja salvos</option></select></div>
           </div>
@@ -2325,21 +2325,36 @@ function renderAutoJobs() {
     const stats = j.lastRunStats ? JSON.parse(j.lastRunStats) : null;
     const statusBadge = j.isActive ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Pausado</span>';
     const isPopulate = j.jobType === 'populate_leads';
+    const isEnrich = j.jobType === 'enrich_phones';
+    const isWaValidate = j.jobType === 'whatsapp_validate';
     const isWhatsApp = j.jobType === 'whatsapp_send';
-    const typeBadge = isPopulate ? '<span class="badge badge-blue">Popular Leads</span>' : isWhatsApp ? '<span class="badge" style="background:#25d366;color:#fff">WhatsApp</span>' : '<span class="badge badge-yellow">Enviar Emails</span>';
+    const typeBadgeMap = {
+      'populate_leads': '<span class="badge badge-blue">Popular Leads</span>',
+      'enrich_phones': '<span class="badge" style="background:#8b5cf6;color:#fff">Enriquecer Tel.</span>',
+      'whatsapp_validate': '<span class="badge" style="background:#06b6d4;color:#fff">Validar WA</span>',
+      'email_send': '<span class="badge badge-yellow">Enviar Emails</span>',
+      'whatsapp_send': '<span class="badge" style="background:#25d366;color:#fff">WhatsApp</span>',
+    };
+    const typeBadge = typeBadgeMap[j.jobType] || '<span class="badge badge-gray">' + j.jobType + '</span>';
     const lastBadge = j.lastRunStatus ? ('<span class="badge ' + (j.lastRunStatus === 'completed' || j.lastRunStatus === 'success' ? 'badge-green' : j.lastRunStatus === 'failed' ? 'badge-red' : 'badge-yellow') + '">' + j.lastRunStatus + '</span>') : '<span class="badge badge-gray">Nunca executado</span>';
     const hours = j.intervalHours || (j.intervalDays ? j.intervalDays * 24 : 24);
     const intervalLabel = hours < 24 ? 'A cada ' + hours + 'h' : hours === 24 ? 'Diario' : 'A cada ' + (hours / 24) + ' dia(s)';
     const statsLabel = isPopulate && stats
       ? ' | Encontrados: ' + (stats.emailsFound||0) + ' | Adicionados: ' + (stats.leadsAdded||stats.emailsSent||0) + ' | Ignorados: ' + (stats.leadsSkipped||stats.emailsSkipped||0)
+      : isEnrich && stats
+        ? ' | Pendentes: ' + (stats.totalPending||0) + ' | Processados: ' + (stats.processed||0) + ' | Enriquecidos: ' + (stats.enriched||0) + ' | Falhas: ' + (stats.failed||0)
+      : isWaValidate && stats
+        ? ' | Pendentes: ' + (stats.totalPending||0) + ' | Verificados: ' + (stats.checked||0) + ' | Com WA: ' + (stats.validated||0) + ' | Sem: ' + (stats.noWhatsApp||0)
       : stats
         ? ' | Encontrados: ' + (stats.emailsFound||0) + ' | Enviados: ' + (stats.emailsSent||0) + ' | Falhas: ' + (stats.emailsFailed||0)
         : '';
     html += '<div class="card" style="margin-bottom:8px">' +
       '<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px">' +
         '<div><strong style="color:#f8fafc;font-size:15px">' + j.name + '</strong> ' + statusBadge + ' ' + typeBadge +
-        '<div style="color:#64748b;font-size:12px;margin-top:4px">Busca: "' + (j.searchKeyword || '*') + '"' + (j.searchUf ? ' | ' + j.searchUf : '') + ' | ' + j.searchQuantity + ' licit. | ' + intervalLabel + ' | Max ' + j.maxEmailsPerRun + (isPopulate ? ' leads' : ' emails') + '</div>' +
-        (j.searchCnae ? '<div style="color:#94a3b8;font-size:11px">CNAE: ' + j.searchCnae + '</div>' : '') +
+        ((isEnrich || isWaValidate)
+          ? '<div style="color:#64748b;font-size:12px;margin-top:4px">' + intervalLabel + ' | Max ' + j.maxEmailsPerRun + ' leads/execucao</div>'
+          : '<div style="color:#64748b;font-size:12px;margin-top:4px">Busca: "' + (j.searchKeyword || '*') + '"' + (j.searchUf ? ' | ' + j.searchUf : '') + ' | ' + j.searchQuantity + ' licit. | ' + intervalLabel + ' | Max ' + j.maxEmailsPerRun + (isPopulate ? ' leads' : ' emails') + '</div>') +
+        (j.searchCnae && !isEnrich && !isWaValidate ? '<div style="color:#94a3b8;font-size:11px">CNAE: ' + j.searchCnae + '</div>' : '') +
         '<div style="color:#64748b;font-size:11px;margin-top:2px">Ultima exec: ' + lastBadge + (j.lastRunAt ? ' em ' + new Date(j.lastRunAt).toLocaleString('pt-BR') : '') + statsLabel + '</div>' +
         (j.nextRunAt && j.isActive ? '<div style="color:#f59e0b;font-size:11px">Proxima: ' + new Date(j.nextRunAt).toLocaleString('pt-BR') + '</div>' : '') +
         '</div>' +
@@ -2359,7 +2374,12 @@ function renderAutoJobs() {
 function toggleAutoJobType() {
   const jobType = document.getElementById('auto-job-type').value;
   const emailFields = document.getElementById('auto-email-fields');
+  const searchRow1 = document.getElementById('auto-search-row-1');
+  const searchRow2 = document.getElementById('auto-search-row-2');
   emailFields.style.display = jobType === 'email_send' ? 'flex' : 'none';
+  const needsSearch = (jobType !== 'enrich_phones' && jobType !== 'whatsapp_validate');
+  if (searchRow1) searchRow1.style.display = needsSearch ? 'flex' : 'none';
+  if (searchRow2) searchRow2.style.display = needsSearch ? 'flex' : 'none';
 }
 
 function showAutoJobForm(id) {
