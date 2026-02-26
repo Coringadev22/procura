@@ -624,6 +624,58 @@ export async function executeJob(jobId: number): Promise<void> {
         })
         .where(eq(automationJobs.id, jobId));
 
+      // Auto-validate WhatsApp for new leads with phones
+      if (leadsAdded > 0) {
+        try {
+          const waConnected = await isConnected();
+          if (waConnected) {
+            const newLeadsWithPhones = await db.select().from(leads).where(
+              and(
+                eq(leads.temWhatsapp, false),
+                isNotNull(leads.telefones),
+                sql`${leads.telefones} != ''`,
+                sql`${leads.origem} = ${"auto_job_" + jobId}`
+              )
+            );
+
+            if (newLeadsWithPhones.length > 0) {
+              const leadPhoneMap = new Map<string, number[]>();
+              for (const lead of newLeadsWithPhones) {
+                const phones = parsePhoneList(lead.telefones!);
+                for (const phone of phones) {
+                  const existing = leadPhoneMap.get(phone) || [];
+                  existing.push(lead.id);
+                  leadPhoneMap.set(phone, existing);
+                }
+              }
+
+              const allPhones = [...leadPhoneMap.keys()];
+              if (allPhones.length > 0) {
+                const waResults = await checkWhatsAppNumbersBatched(allPhones, 50);
+                const leadsWithWA = new Set<number>();
+                for (const [phone, hasWA] of waResults) {
+                  if (hasWA) {
+                    const leadIds = leadPhoneMap.get(phone) || [];
+                    for (const lid of leadIds) leadsWithWA.add(lid);
+                  }
+                }
+
+                let waValidated = 0;
+                for (const lead of newLeadsWithPhones) {
+                  const hasWA = leadsWithWA.has(lead.id);
+                  await db.update(leads).set({ temWhatsapp: hasWA }).where(eq(leads.id, lead.id));
+                  if (hasWA) waValidated++;
+                }
+
+                logger.info(`Populate "${job.name}": WhatsApp validado em ${newLeadsWithPhones.length} leads — ${waValidated} com WhatsApp`);
+              }
+            }
+          }
+        } catch (waErr: any) {
+          logger.error(`Populate "${job.name}": WhatsApp validation error: ${waErr.message}`);
+        }
+      }
+
       logger.info(
         `Automacao "${job.name}" concluida: ${leadsAdded} leads adicionados, ${leadsSkipped} ignorados de ${emailsFound} encontrados`
       );
