@@ -17,11 +17,7 @@ const DELAY_BETWEEN_SENDS_MS = 3000; // 3 seconds (WhatsApp is stricter)
 // 1.1 Empresas que licitam (pncp, pncp_contratos, sicaf, tce_sp, tce_rj)
 const LICITANTES_V1 = `Oi, poderia me informar quem é o responsável pela área de licitações na empresa?
 
-Sou Alvaro Gonzaga, advogado especializado em licitações e contratos públicos.
-
-www.alvarogonzaga.com.br
-
-Responda SAIR para não receber mais mensagens.`;
+Sou Alvaro Gonzaga, advogado especializado em licitações e contratos públicos.`;
 
 const LICITANTES_V2 = `Olá! Entramos em contato há alguns dias sobre assessoria jurídica em licitações.
 
